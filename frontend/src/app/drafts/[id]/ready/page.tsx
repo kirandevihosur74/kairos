@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
@@ -20,10 +21,10 @@ function Ready({ draftId }: { draftId: string }) {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [person, setPerson] = useState<PersonCard | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "missing">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "missing">(
+    "loading",
+  );
   const [autocopy, setAutocopy] = useState(false);
-
-  const [copied, setCopied] = useState<"email" | "linkedin" | "subject" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,9 +58,8 @@ function Ready({ draftId }: { draftId: string }) {
   // Autocopy the email body on arrival once per draft.
   useEffect(() => {
     if (!draft || autocopy) return;
-    if (draft.status !== "approved") return;
     if (typeof navigator === "undefined" || !navigator.clipboard) return;
-    const payload = formatEmail(draft);
+    const payload = draft.body;
     navigator.clipboard.writeText(payload).then(
       () => {
         setAutocopy(true);
@@ -70,26 +70,6 @@ function Ready({ draftId }: { draftId: string }) {
       },
     );
   }, [draft, autocopy, showToast]);
-
-  async function copy(kind: "email" | "linkedin" | "subject") {
-    if (!draft) return;
-    const text =
-      kind === "email"
-        ? formatEmail(draft)
-        : kind === "linkedin"
-          ? draft.linkedin_message
-          : draft.subject;
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(kind);
-      showToast("Copied");
-      window.setTimeout(() => {
-        setCopied((prev) => (prev === kind ? null : prev));
-      }, 1200);
-    } catch {
-      showToast("Copy failed");
-    }
-  }
 
   if (status === "loading") {
     return (
@@ -109,7 +89,11 @@ function Ready({ draftId }: { draftId: string }) {
           <p className="font-serif text-[28px] leading-tight text-ink">
             That draft isn’t here.
           </p>
-          <Button variant="secondary" size="md" onClick={() => router.replace("/drafts")}>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => router.replace("/drafts")}
+          >
             Back to drafts
           </Button>
         </div>
@@ -126,6 +110,16 @@ function Ready({ draftId }: { draftId: string }) {
       })
     : null;
 
+  const mailtoHref = (() => {
+    const params = new URLSearchParams();
+    if (draft.subject) params.set("subject", draft.subject);
+    if (draft.body) params.set("body", draft.body);
+    const qs = params.toString();
+    return qs ? `mailto:?${qs}` : "mailto:";
+  })();
+
+  const linkedinHref = "https://linkedin.com/messaging";
+
   return (
     <PhoneShell>
       <div className="flex flex-1 flex-col gap-6 px-5 pt-2">
@@ -139,39 +133,33 @@ function Ready({ draftId }: { draftId: string }) {
           </button>
         </div>
 
-        <ReadyGlyph />
+        <div className="pt-2">
+          <Image
+            src="/emoji/follow-up.svg"
+            alt=""
+            width={72}
+            height={72}
+            aria-hidden
+          />
+        </div>
 
         <div className="flex flex-col gap-5">
           <h1 className="font-serif text-[38px] leading-[1.05] tracking-[-0.4px] text-ink">
             Ready to send to {name}.
           </h1>
           <p className="text-[15px] leading-[1.45] text-muted">
-            Copied to your clipboard. Kairos never sends for you; paste it into
-            your email or LinkedIn.
+            Copied to your clipboard. Kairos never sends for you.
           </p>
         </div>
 
-        {/* Subject card */}
         <div className="flex flex-col gap-[6px] rounded-[12px] border border-line bg-card p-4">
-          <SectionLabel>Subject</SectionLabel>
+          <SectionLabel>SUBJECT</SectionLabel>
           <p className="text-[15px] font-medium text-ink">{draft.subject}</p>
           <p className="text-[13px] text-muted">
             {approvedTime
               ? `Approved ${approvedTime} · Email and LinkedIn`
               : "Email and LinkedIn"}
           </p>
-          <div className="mt-2 flex gap-2">
-            <CopyButton
-              label="Copy email"
-              active={copied === "email"}
-              onClick={() => void copy("email")}
-            />
-            <CopyButton
-              label="Copy LinkedIn"
-              active={copied === "linkedin"}
-              onClick={() => void copy("linkedin")}
-            />
-          </div>
         </div>
 
         <p className="text-[12px] text-faint">
@@ -179,96 +167,26 @@ function Ready({ draftId }: { draftId: string }) {
         </p>
 
         <div className="mt-auto flex flex-col gap-3 pb-6">
-          <Button
-            variant="secondary"
-            size="lg"
-            fullWidth
-            onClick={() =>
-              router.push(`/drafts/new?person=${encodeURIComponent(draft.person_id)}`)
-            }
+          <a
+            href={linkedinHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-[52px] w-full items-center justify-center rounded-full bg-card border border-ink text-[15px] font-semibold text-ink hover:bg-subtle"
           >
-            New draft
-          </Button>
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={() => router.push("/today")}
-            trailing={<span aria-hidden>→</span>}
+            Open LinkedIn
+          </a>
+          <a
+            href={mailtoHref}
+            className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-ink text-[15px] font-semibold text-white hover:bg-ink/90"
           >
-            Back to Today
-          </Button>
+            Open in Gmail
+            <span aria-hidden>→</span>
+          </a>
         </div>
       </div>
       <AppNav />
     </PhoneShell>
   );
-}
-
-function CopyButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors " +
-        (active
-          ? "border-ink bg-ink text-white"
-          : "border-line bg-card text-ink hover:bg-subtle")
-      }
-      aria-live="polite"
-    >
-      <span aria-hidden>{active ? "✓" : "⧉"}</span>
-      <span>{active ? "Copied" : label}</span>
-    </button>
-  );
-}
-
-function ReadyGlyph() {
-  return (
-    <div
-      aria-hidden
-      className="flex h-[72px] w-[72px] items-center justify-center rounded-[16px] border border-line bg-card"
-    >
-      <svg
-        viewBox="0 0 32 32"
-        fill="none"
-        className="h-9 w-9"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M4 10l12 8 12-8" className="text-faint" />
-        <rect
-          x="4"
-          y="8"
-          width="24"
-          height="18"
-          rx="2"
-          className="text-ink"
-        />
-        <path
-          d="M16 4v10m0 0l-3-3m3 3l3-3"
-          className="text-alert"
-          strokeWidth="2"
-        />
-      </svg>
-    </div>
-  );
-}
-
-function formatEmail(draft: Draft): string {
-  const subject = draft.subject.trim();
-  return subject ? `Subject: ${subject}\n\n${draft.body}` : draft.body;
 }
 
 function DraftReadyRoute() {

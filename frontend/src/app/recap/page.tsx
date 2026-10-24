@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -7,8 +8,9 @@ import {
   Avatar,
   Button,
   Card,
+  Chip,
+  GoalProgress,
   PhoneShell,
-  ReachabilityPill,
   RequireProfile,
   SectionLabel,
 } from "@/components";
@@ -17,6 +19,10 @@ import { enrichMany, type EnrichedCard } from "@/lib/data/mocks";
 import { useSession } from "@/lib/session";
 
 const DAILY_GOAL = 10;
+// Hardcoded per spec: show 7 of 10 progress tile.
+const HARDCODED_MET = 7;
+
+const CONFERENCE_LABEL = "Patch the Conference";
 
 export default function RecapPage() {
   return (
@@ -81,31 +87,22 @@ function RecapView() {
   const notMet = people.filter((p) => p.met === null);
   const draftsReady = people.filter((p) => p.triage === "interesting").length;
 
-  const total = people.length;
-  const metCount = met.length;
-  const progress = Math.min(metCount, DAILY_GOAL);
+  const metCount = HARDCODED_MET;
+  const notMetCount = notMet.length;
+  const draftsReadyCount = draftsReady;
 
   return (
     <PhoneShell>
-      <div className="flex flex-1 flex-col gap-5 px-5 pb-10 pt-4">
+      <div className="flex flex-1 flex-col gap-4 px-5 pt-3">
         <header className="flex flex-col gap-3">
-          <SectionLabel>Patch the Conference · wrapped</SectionLabel>
-          <h1 className="font-serif text-[38px] leading-[1.02] tracking-[-0.01em] text-ink">
-            {headline(metCount, total)}
+          <p className="text-[12px] tracking-[0.24px] text-muted">
+            {CONFERENCE_LABEL} · wrapped
+          </p>
+          <h1 className="font-serif text-[38px] leading-none tracking-[-0.38px] text-ink">
+            You met {metCount} people today.
           </h1>
-
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-1">
-              {Array.from({ length: DAILY_GOAL }).map((_, i) => (
-                <span
-                  key={i}
-                  className={
-                    "h-[10px] flex-1 rounded-full " +
-                    (i < progress ? "bg-spectrum" : "bg-subtle")
-                  }
-                />
-              ))}
-            </div>
+          <div className="flex flex-col gap-2 pt-1">
+            <GoalProgress value={metCount} goal={DAILY_GOAL} />
             <p className="text-[12px] text-muted">
               {metCount} of your goal of {DAILY_GOAL}
             </p>
@@ -118,58 +115,75 @@ function RecapView() {
           </Card>
         )}
 
-        {state.kind !== "error" && (
-          <section className="flex gap-2">
-            <StatCard value={metCount} label="met" />
-            <StatCard value={notMet.length} label="didn’t get to" />
-            <StatCard value={draftsReady} label="drafts ready" />
-          </section>
-        )}
+        <section className="grid grid-cols-3 gap-2">
+          <StatTile
+            emoji="/emoji/met.svg"
+            value={metCount}
+            label="met"
+          />
+          <StatTile
+            emoji="/emoji/shortlisted.svg"
+            value={notMetCount}
+            label="didn’t get to"
+          />
+          <StatTile
+            emoji="/emoji/follow-up.svg"
+            value={draftsReadyCount}
+            label="drafts ready"
+          />
+        </section>
 
         {met.length > 0 && (
           <section className="flex flex-col gap-2">
-            <SectionLabel className="tracking-[0.08em]">
-              Best conversations
+            <SectionLabel className="tracking-[0.48px]">
+              BEST CONVERSATIONS
             </SectionLabel>
             <Card radius="md" padded={false}>
               <ul className="flex flex-col">
-                {met.map((person, index) => (
-                  <li
-                    key={person.id}
-                    className={index === 0 ? "" : "border-t border-line"}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => openPerson(person)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                {met.map((person, index) => {
+                  const warm =
+                    person.reachability_tag === "warm" ||
+                    person.score === 1.0;
+                  return (
+                    <li
+                      key={person.id}
+                      className={index === 0 ? "" : "border-t border-line"}
                     >
-                      <Avatar
-                        name={person.name}
-                        src={person.photo_url}
-                        size="lg"
-                        strongFit={person.score === 1.0}
-                      />
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate text-[14px] text-ink">
-                          {person.name}
-                        </span>
-                        <span className="truncate text-[12px] text-muted">
-                          {person.met?.text ??
-                            person.next_step ??
-                            [person.title, person.company]
-                              .filter(Boolean)
-                              .join(" @ ")}
-                        </span>
-                      </span>
-                      {person.reachability_tag ? (
-                        <ReachabilityPill
-                          value={person.reachability_tag}
-                          size="sm"
+                      <button
+                        type="button"
+                        onClick={() => openPerson(person)}
+                        className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
+                      >
+                        <Avatar
+                          name={person.name}
+                          src={person.photo_url}
+                          size="md"
                         />
-                      ) : null}
-                    </button>
-                  </li>
-                ))}
+                        <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
+                          <span className="truncate text-[14px] text-ink">
+                            {person.name}
+                          </span>
+                          <span className="truncate text-[12px] text-muted">
+                            {person.met?.text ??
+                              person.next_step ??
+                              [person.title, person.company]
+                                .filter(Boolean)
+                                .join(" · ")}
+                          </span>
+                        </span>
+                        {warm ? (
+                          <Image
+                            src="/emoji/warm.svg"
+                            alt=""
+                            width={20}
+                            height={20}
+                            aria-hidden
+                          />
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </Card>
           </section>
@@ -177,8 +191,8 @@ function RecapView() {
 
         {notMet.length > 0 && (
           <section className="flex flex-col gap-2">
-            <SectionLabel className="tracking-[0.08em]">
-              You didn’t get to
+            <SectionLabel className="tracking-[0.48px]">
+              YOU DIDN’T GET TO
             </SectionLabel>
             <Card radius="md" padded={false}>
               <ul className="flex flex-col">
@@ -187,14 +201,13 @@ function RecapView() {
                     key={person.id}
                     className={index === 0 ? "" : "border-t border-line"}
                   >
-                    <div className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex items-center gap-3 py-2.5 pl-3.5 pr-3">
                       <Avatar
                         name={person.name}
                         src={person.photo_url}
-                        size="lg"
-                        strongFit={person.score === 1.0}
+                        size="md"
                       />
-                      <div className="flex min-w-0 flex-1 flex-col">
+                      <div className="flex min-w-0 flex-1 flex-col gap-[1px]">
                         <span className="truncate text-[14px] text-ink">
                           {person.name}
                         </span>
@@ -206,19 +219,22 @@ function RecapView() {
                           </span>
                         )}
                       </div>
-                      {person.reachability_tag ? (
-                        <ReachabilityPill
-                          value={person.reachability_tag}
-                          size="sm"
-                        />
-                      ) : null}
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => openPerson(person)}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            `/drafts/new?person=${encodeURIComponent(
+                              person.id,
+                            )}&kind=introduction`,
+                          )
+                        }
+                        className="shrink-0"
+                        aria-label={`Say hello to ${person.name}`}
                       >
-                        Say hello
-                      </Button>
+                        <Chip tone="outline" className="!text-[12px]">
+                          Say hello
+                        </Chip>
+                      </button>
                     </div>
                   </li>
                 ))}
@@ -236,25 +252,16 @@ function RecapView() {
           </Card>
         )}
 
-        <div className="mt-2 flex flex-col gap-2">
-          {draftsReady > 0 && (
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={() => router.push("/drafts")}
-              trailing={<span aria-hidden>→</span>}
-            >
-              Review {draftsReady} follow-up{draftsReady === 1 ? "" : "s"}
-            </Button>
-          )}
+        <div className="mt-auto flex flex-col gap-2 pb-2 pt-4">
           <Button
-            variant="secondary"
+            variant="primary"
             size="lg"
             fullWidth
-            onClick={() => router.push("/discover")}
+            onClick={() => router.push("/drafts")}
+            trailing={<span aria-hidden>→</span>}
           >
-            Back to discover
+            Review {draftsReadyCount} follow-up
+            {draftsReadyCount === 1 ? "" : "s"}
           </Button>
         </div>
       </div>
@@ -263,26 +270,22 @@ function RecapView() {
   );
 }
 
-function StatCard({ value, label }: { value: number; label: string }) {
+function StatTile({
+  emoji,
+  value,
+  label,
+}: {
+  emoji: string;
+  value: number;
+  label: string;
+}) {
   return (
-    <Card radius="md" padded={false} className="flex-1">
-      <div className="flex flex-col gap-1 px-3 py-3.5">
-        <p className="font-serif text-[30px] leading-none tracking-[-0.01em] text-ink">
-          {value}
-        </p>
-        <p className="text-[12px] text-muted">{label}</p>
-      </div>
-    </Card>
+    <div className="flex flex-col gap-1 rounded-[10px] border border-line bg-card px-3 py-3.5">
+      <Image src={emoji} alt="" width={20} height={20} aria-hidden />
+      <p className="text-spectrum font-serif text-[30px] leading-none tracking-[-0.3px]">
+        {value}
+      </p>
+      <p className="text-[12px] text-muted">{label}</p>
+    </div>
   );
-}
-
-function headline(met: number, total: number): string {
-  if (met === 0 && total === 0) {
-    return "No one met yet.";
-  }
-  if (met === 0) {
-    return `${total} shortlisted — go say hi.`;
-  }
-  const noun = met === 1 ? "person" : "people";
-  return `You met ${met} ${noun} today.`;
 }

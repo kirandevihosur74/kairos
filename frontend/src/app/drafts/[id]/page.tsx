@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import {
@@ -18,6 +19,7 @@ import {
   type DraftKind,
   type PersonCard,
 } from "@/lib/api";
+import { enrich, type EnrichedCard } from "@/lib/data/mocks";
 import { useSession } from "@/lib/session";
 
 type Channel = "email" | "linkedin";
@@ -28,19 +30,16 @@ const kindLabel: Record<DraftKind, string> = {
   referral: "Referral request",
 };
 
-const kindTone: Record<DraftKind, "outline" | "cream" | "amber"> = {
-  introduction: "outline",
-  follow_up: "cream",
-  referral: "amber",
-};
-
 function DraftReview({ draftId }: { draftId: string }) {
   const router = useRouter();
   const { conferenceId } = useSession();
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [person, setPerson] = useState<PersonCard | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "missing">("loading");
+  const [enriched, setEnriched] = useState<EnrichedCard | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "missing">(
+    "loading",
+  );
   const [error, setError] = useState<string | null>(null);
 
   const [channel, setChannel] = useState<Channel>("email");
@@ -51,6 +50,7 @@ function DraftReview({ draftId }: { draftId: string }) {
 
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [rewriting, setRewriting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,7 +65,10 @@ function DraftReview({ draftId }: { draftId: string }) {
         try {
           const cid = conferenceId ?? d.conference_id;
           const p = await api.getPerson(d.person_id, cid);
-          if (!cancelled) setPerson(p);
+          if (!cancelled) {
+            setPerson(p);
+            setEnriched(enrich(p));
+          }
         } catch {
           // Non-blocking.
         }
@@ -76,7 +79,11 @@ function DraftReview({ draftId }: { draftId: string }) {
           setStatus("missing");
           return;
         }
-        setError(err instanceof ApiError ? describeError(err) : "Could not load draft.");
+        setError(
+          err instanceof ApiError
+            ? describeError(err)
+            : "Could not load draft.",
+        );
         setStatus("ready");
       }
     })();
@@ -115,7 +122,11 @@ function DraftReview({ draftId }: { draftId: string }) {
       setLinkedinMessage(updated.linkedin_message);
       setEditing(false);
     } catch (err) {
-      setError(err instanceof ApiError ? describeError(err) : "Could not save edits.");
+      setError(
+        err instanceof ApiError
+          ? describeError(err)
+          : "Could not save edits.",
+      );
     } finally {
       setSaving(false);
     }
@@ -126,7 +137,6 @@ function DraftReview({ draftId }: { draftId: string }) {
     setApproving(true);
     setError(null);
     try {
-      // Persist any pending edits first, in case the user hit Approve directly.
       if (dirty) {
         await api.updateDraft(draft.id, {
           subject: subject.trim(),
@@ -141,8 +151,42 @@ function DraftReview({ draftId }: { draftId: string }) {
       });
       router.push(`/drafts/${draft.id}/ready`);
     } catch (err) {
-      setError(err instanceof ApiError ? describeError(err) : "Could not approve this draft.");
+      setError(
+        err instanceof ApiError
+          ? describeError(err)
+          : "Could not approve this draft.",
+      );
       setApproving(false);
+    }
+  }
+
+  async function onRewrite() {
+    if (!draft) return;
+    const cid = conferenceId ?? draft.conference_id;
+    setRewriting(true);
+    setError(null);
+    try {
+      const fresh = await api.draftFollowup(
+        draft.person_id,
+        cid,
+        draft.kind,
+      );
+      setDraft(fresh);
+      setSubject(fresh.subject);
+      setBody(fresh.body);
+      setLinkedinMessage(fresh.linkedin_message);
+      // Rewritten drafts have a new id; route there to replace the stale URL.
+      if (fresh.id !== draft.id) {
+        router.replace(`/drafts/${fresh.id}`);
+      }
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? describeError(err)
+          : "Could not rewrite this draft.",
+      );
+    } finally {
+      setRewriting(false);
     }
   }
 
@@ -167,7 +211,11 @@ function DraftReview({ draftId }: { draftId: string }) {
           <p className="text-[14px] text-muted">
             It may have been removed. Check your queue.
           </p>
-          <Button variant="secondary" size="md" onClick={() => router.replace("/drafts")}>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => router.replace("/drafts")}
+          >
             Back to drafts
           </Button>
         </div>
@@ -189,9 +237,14 @@ function DraftReview({ draftId }: { draftId: string }) {
     return kindLabel[draft.kind];
   })();
 
+  const notesCount = person?.notes?.length ?? 0;
+  const talkTitle = enriched?.session_slot?.title ?? null;
+  const connector = enriched?.warm_intro_hint?.connector ?? null;
+
   return (
     <PhoneShell>
-      <div className="flex flex-1 flex-col gap-[14px] px-5 pt-2">
+      <div className="flex flex-1 flex-col gap-[14px] px-5 pt-1">
+        {/* Top bar */}
         <div className="flex items-center justify-between pb-1 pt-1">
           <button
             type="button"
@@ -201,16 +254,24 @@ function DraftReview({ draftId }: { draftId: string }) {
             <span aria-hidden>‹</span>
             <span>Follow-ups</span>
           </button>
-          <Chip tone={kindTone[draft.kind]} className="!text-[12px]">
-            {kindLabel[draft.kind]}
-          </Chip>
+          <button
+            type="button"
+            onClick={() => void onRewrite()}
+            disabled={rewriting}
+            className="flex items-center gap-1.5 text-[13px] font-medium text-muted disabled:opacity-50"
+            aria-label="Rewrite draft"
+          >
+            <RefreshIcon />
+            <span>{rewriting ? "Rewriting…" : "Rewrite"}</span>
+          </button>
         </div>
 
+        {/* Header row */}
         <div className="flex items-center gap-3">
           <Avatar
             name={person?.name ?? "Someone"}
             src={person?.photo_url ?? undefined}
-            size="lg"
+            size="md"
           />
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <p className="truncate text-[15px] text-ink">
@@ -246,69 +307,54 @@ function DraftReview({ draftId }: { draftId: string }) {
           />
         </div>
 
-        {/* Draft card */}
-        <div className="flex flex-col gap-3 rounded-[12px] border border-line bg-card p-4">
+        {/* Draft content card — read-only preview */}
+        <div className="flex flex-col gap-[10px] rounded-[12px] border border-line bg-card p-4">
           {channel === "email" ? (
             <>
-              {editing ? (
-                <input
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="Subject"
-                  className="w-full rounded-[8px] border border-line bg-card px-3 py-2 font-serif text-[22px] leading-tight tracking-[-0.24px] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
-                />
-              ) : (
-                <p className="font-serif text-[24px] leading-tight tracking-[-0.24px] text-ink">
-                  {subject || "(no subject)"}
-                </p>
-              )}
-              <div className="h-px w-full bg-line" />
-              {editing ? (
-                <textarea
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  className="min-h-[220px] w-full rounded-[8px] border border-line bg-card px-3 py-2 text-[15px] leading-[1.55] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
-                  placeholder="Write the email body."
-                />
-              ) : (
-                <p className="whitespace-pre-wrap text-[15px] leading-[1.55] text-ink">
-                  {body}
-                </p>
-              )}
+              <p className="font-serif text-[24px] leading-tight tracking-[-0.24px] text-ink">
+                {subject || "(no subject)"}
+              </p>
+              <p className="whitespace-pre-wrap text-[15px] leading-[1.55] text-ink">
+                {body}
+              </p>
             </>
           ) : (
             <>
               <SectionLabel>LinkedIn message</SectionLabel>
-              {editing ? (
-                <textarea
-                  value={linkedinMessage}
-                  onChange={(e) => setLinkedinMessage(e.target.value)}
-                  className="min-h-[180px] w-full rounded-[8px] border border-line bg-card px-3 py-2 text-[15px] leading-[1.55] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
-                  placeholder="Short LinkedIn note."
-                />
-              ) : (
-                <p className="whitespace-pre-wrap text-[15px] leading-[1.55] text-ink">
-                  {linkedinMessage || "(empty)"}
-                </p>
-              )}
+              <p className="whitespace-pre-wrap text-[15px] leading-[1.55] text-ink">
+                {linkedinMessage || "(empty)"}
+              </p>
             </>
           )}
         </div>
 
         {/* Grounded in */}
         <div className="flex flex-col gap-2">
-          <SectionLabel>Grounded in</SectionLabel>
+          <SectionLabel className="tracking-[0.48px]">GROUNDED IN</SectionLabel>
           <div className="flex flex-wrap gap-1.5">
-            {draft.grounded_on.length === 0 ? (
+            <GroundedChip
+              emoji="/emoji/note.svg"
+              label={
+                notesCount > 0
+                  ? `Your ${notesCount} note${notesCount === 1 ? "" : "s"}`
+                  : "Your note"
+              }
+            />
+            {talkTitle ? (
+              <GroundedChip emoji="/emoji/speaker.svg" label="Her talk" />
+            ) : null}
+            {connector ? (
+              <GroundedChip
+                emoji="/emoji/warm-intro.svg"
+                label={`${connector} intro`}
+              />
+            ) : null}
+            {draft.grounded_on.length === 0 &&
+            !talkTitle &&
+            !connector &&
+            notesCount === 0 ? (
               <Chip tone="outline">Your background</Chip>
-            ) : (
-              draft.grounded_on.map((g) => (
-                <Chip key={g.id} tone="neutral" className="!text-[12px]">
-                  <span className="text-muted">{labelForType(g.type)}:</span>
-                  <span className="ml-1 text-ink">{truncate(g.text, 42)}</span>
-                </Chip>
-              ))
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -322,61 +368,155 @@ function DraftReview({ draftId }: { draftId: string }) {
       {/* Bottom action bar */}
       <div className="mt-auto border-t border-line bg-card px-5 pb-4 pt-3">
         <div className="flex gap-2.5">
-          {editing ? (
-            <>
-              <Button
-                variant="secondary"
-                size="lg"
-                className="flex-1"
-                onClick={() => {
-                  setSubject(draft.subject);
-                  setBody(draft.body);
-                  setLinkedinMessage(draft.linkedin_message);
-                  setEditing(false);
-                }}
-                disabled={saving}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="lg"
-                className="flex-1"
-                onClick={() => void onSave()}
-                disabled={saving || !dirty}
-              >
-                {saving ? "Saving…" : "Save edits"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="secondary"
-                size="lg"
-                className="flex-1"
-                onClick={() => setEditing(true)}
-                leading={<span aria-hidden>✎</span>}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="primary"
-                size="lg"
-                className="flex-1"
-                onClick={() => void onApprove()}
-                disabled={approving}
-              >
-                {approving ? "Approving…" : "Approve & copy"}
-              </Button>
-            </>
-          )}
+          <Button
+            variant="ghost"
+            size="lg"
+            className="flex-1"
+            onClick={() => setEditing(true)}
+            leading={<span aria-hidden>✎</span>}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
+            className="flex-1"
+            onClick={() => void onApprove()}
+            disabled={approving}
+          >
+            {approving ? "Approving…" : "Approve & copy"}
+          </Button>
         </div>
-        <p className="pt-2 text-center text-[12px] text-muted">
-          Kairos never sends for you.
+        <p className="flex items-center justify-center gap-1.5 pt-2 text-center text-[12px] text-muted">
+          <ShieldIcon />
+          <span>Opens Gmail. Kairos never sends for you.</span>
         </p>
       </div>
+
+      {editing ? (
+        <EditSheet
+          subject={subject}
+          body={body}
+          linkedinMessage={linkedinMessage}
+          onChangeSubject={setSubject}
+          onChangeBody={setBody}
+          onChangeLinkedin={setLinkedinMessage}
+          dirty={dirty}
+          saving={saving}
+          onCancel={() => {
+            setSubject(draft.subject);
+            setBody(draft.body);
+            setLinkedinMessage(draft.linkedin_message);
+            setEditing(false);
+          }}
+          onSave={() => void onSave()}
+        />
+      ) : null}
+
       <AppNav />
     </PhoneShell>
+  );
+}
+
+function GroundedChip({ emoji, label }: { emoji: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-subtle px-2.5 py-1 text-[12px] font-medium text-ink">
+      <Image src={emoji} alt="" width={14} height={14} aria-hidden />
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function EditSheet({
+  subject,
+  body,
+  linkedinMessage,
+  onChangeSubject,
+  onChangeBody,
+  onChangeLinkedin,
+  dirty,
+  saving,
+  onCancel,
+  onSave,
+}: {
+  subject: string;
+  body: string;
+  linkedinMessage: string;
+  onChangeSubject: (v: string) => void;
+  onChangeBody: (v: string) => void;
+  onChangeLinkedin: (v: string) => void;
+  dirty: boolean;
+  saving: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Edit draft"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-[430px] rounded-t-[20px] bg-paper px-5 pb-6 pt-4 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
+        <p className="pb-3 font-serif text-[22px] leading-tight tracking-[-0.22px] text-ink">
+          Edit draft
+        </p>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <SectionLabel>SUBJECT</SectionLabel>
+            <input
+              value={subject}
+              onChange={(e) => onChangeSubject(e.target.value)}
+              placeholder="Subject"
+              className="h-12 rounded-[12px] border border-line bg-card px-3 text-[15px] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <SectionLabel>EMAIL BODY</SectionLabel>
+            <textarea
+              value={body}
+              onChange={(e) => onChangeBody(e.target.value)}
+              className="min-h-[180px] rounded-[12px] border border-line bg-card px-3 py-2 text-[15px] leading-[1.5] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
+              placeholder="Write the email body."
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <SectionLabel>LINKEDIN MESSAGE</SectionLabel>
+            <textarea
+              value={linkedinMessage}
+              onChange={(e) => onChangeLinkedin(e.target.value)}
+              className="min-h-[120px] rounded-[12px] border border-line bg-card px-3 py-2 text-[15px] leading-[1.5] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
+              placeholder="Short LinkedIn note."
+            />
+          </div>
+        </div>
+        <div className="flex gap-2.5 pt-4">
+          <Button
+            variant="secondary"
+            size="lg"
+            className="flex-1"
+            onClick={onCancel}
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
+            className="flex-1"
+            onClick={onSave}
+            disabled={saving || !dirty}
+          >
+            {saving ? "Saving…" : "Save edits"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -395,7 +535,9 @@ function ChannelTab({
       onClick={onClick}
       className={
         "flex-1 rounded-full py-2 text-[13px] transition-colors " +
-        (active ? "bg-card text-ink font-semibold" : "bg-transparent text-muted font-medium")
+        (active
+          ? "bg-card text-ink font-semibold"
+          : "bg-transparent text-muted font-medium")
       }
     >
       {label}
@@ -403,21 +545,39 @@ function ChannelTab({
   );
 }
 
-function labelForType(t: string): string {
-  switch (t) {
-    case "profile":
-      return "You";
-    case "person":
-      return "Them";
-    case "note":
-      return "Note";
-    default:
-      return t;
-  }
+function RefreshIcon() {
+  return (
+    <svg
+      viewBox="0 0 18 18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[18px] w-[18px]"
+      aria-hidden
+    >
+      <path d="M3 9a6 6 0 0 1 10.5-4" />
+      <path d="M15 9a6 6 0 0 1-10.5 4" />
+      <path d="M13.5 2.5v3H10.5" />
+      <path d="M4.5 15.5v-3H7.5" />
+    </svg>
+  );
 }
 
-function truncate(s: string, n: number): string {
-  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+function ShieldIcon() {
+  return (
+    <svg
+      viewBox="0 0 14 14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      className="h-[14px] w-[14px]"
+      aria-hidden
+    >
+      <path d="M7 1.5l5 2v4c0 3-2.5 5-5 5s-5-2-5-5v-4l5-2z" />
+    </svg>
+  );
 }
 
 function describeError(err: ApiError): string {

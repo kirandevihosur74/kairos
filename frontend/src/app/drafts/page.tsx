@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -9,7 +10,12 @@ import {
   PhoneShell,
   RequireProfile,
 } from "@/components";
-import { ApiError, api, type Draft, type DraftKind, type DraftStatus } from "@/lib/api";
+import {
+  ApiError,
+  api,
+  type Draft,
+  type PersonCard,
+} from "@/lib/api";
 import { useSession } from "@/lib/session";
 
 const QUEUE_STORAGE_KEY = "kairos.drafts";
@@ -36,36 +42,45 @@ function writeQueue(ids: string[]) {
   }
 }
 
-interface Row {
+interface DraftRow {
+  kind: "draft";
+  id: string;
   draft: Draft;
   personName: string;
-  personTitle: string | null;
+  subtitle: string;
   photoUrl: string | null;
 }
 
+interface NeedsNoteRow {
+  kind: "needs_note";
+  id: string;
+  personId: string;
+  personName: string;
+  subtitle: string;
+  photoUrl: string | null;
+}
+
+type Row = DraftRow | NeedsNoteRow;
+
 type Filter = "all" | "draft" | "approved";
 
-const kindLabel: Record<DraftKind, string> = {
-  introduction: "Introduction",
-  follow_up: "Follow-up",
-  referral: "Referral",
-};
+type StatusKey = "drafted" | "approved" | "needs_note";
 
-const kindTone: Record<DraftKind, "outline" | "cream" | "amber"> = {
-  introduction: "outline",
-  follow_up: "cream",
-  referral: "amber",
-};
-
-const statusTone: Record<DraftStatus, "on" | "outline"> = {
-  approved: "on",
-  draft: "outline",
-};
-
-const statusLabel: Record<DraftStatus, string> = {
+const statusLabel: Record<StatusKey, string> = {
+  drafted: "Drafted",
   approved: "Approved",
-  draft: "Drafted",
+  needs_note: "Needs note",
 };
+
+const statusEmoji: Record<StatusKey, string> = {
+  drafted: "/emoji/follow-up.svg",
+  approved: "/emoji/met.svg",
+  needs_note: "/emoji/note.svg",
+};
+
+function statusForDraft(d: Draft): StatusKey {
+  return d.status === "approved" ? "approved" : "drafted";
+}
 
 function DraftsQueue() {
   const router = useRouter();
@@ -86,55 +101,83 @@ function DraftsQueue() {
     let cancelled = false;
 
     (async () => {
-      const ids = readQueue();
-      if (ids.length === 0) {
-        if (!cancelled) {
-          setRows([]);
-          setLoading(false);
-          setError(null);
-        }
-        return;
-      }
-
-      const results: Row[] = [];
+      const draftIds = readQueue();
+      const draftRows: DraftRow[] = [];
       const keep: string[] = [];
+
       try {
-        for (const id of ids) {
+        for (const id of draftIds) {
           try {
             const draft = await api.getDraft(id);
             keep.push(id);
             let personName = "Someone";
-            let personTitle: string | null = null;
+            let subtitle = draft.subject;
             let photoUrl: string | null = null;
             try {
-              const person = await api.getPerson(draft.person_id, conferenceId);
+              const person = await api.getPerson(
+                draft.person_id,
+                conferenceId,
+              );
               personName = person.name;
-              personTitle = person.title ?? person.company ?? null;
+              subtitle = draft.subject || person.title || person.company || "";
               photoUrl = person.photo_url ?? null;
             } catch {
-              // leave fallback name/title.
+              // Fall back.
             }
-            results.push({ draft, personName, personTitle, photoUrl });
+            draftRows.push({
+              kind: "draft",
+              id: draft.id,
+              draft,
+              personName,
+              subtitle,
+              photoUrl,
+            });
           } catch (err) {
-            if (err instanceof ApiError && err.status === 404) {
-              // Drop missing drafts from the queue.
-              continue;
-            }
-            // On transient errors, keep the id so we try again next load.
+            if (err instanceof ApiError && err.status === 404) continue;
             keep.push(id);
           }
         }
+
         if (cancelled) return;
-        if (keep.length !== ids.length) writeQueue(keep);
-        // Most recent drafts first — queue is append order; reverse it.
-        results.reverse();
-        setRows(results);
+        if (keep.length !== draftIds.length) writeQueue(keep);
+
+        // Needs-note rows: interesting people with no met note.
+        let needsNote: NeedsNoteRow[] = [];
+        try {
+          const interesting = await api.listPeople(
+            conferenceId,
+            "interesting",
+          );
+          const draftedPersonIds = new Set(
+            draftRows.map((r) => r.draft.person_id),
+          );
+          needsNote = interesting
+            .filter((p: PersonCard) => p.met === null)
+            .filter((p: PersonCard) => !draftedPersonIds.has(p.id))
+            .map((p: PersonCard) => ({
+              kind: "needs_note" as const,
+              id: `needs:${p.id}`,
+              personId: p.id,
+              personName: p.name,
+              subtitle: "Add a note first",
+              photoUrl: p.photo_url ?? null,
+            }));
+        } catch {
+          // Non-blocking.
+        }
+
+        if (cancelled) return;
+        // Most-recent drafts first; needs-note after.
+        draftRows.reverse();
+        setRows([...draftRows, ...needsNote]);
         setError(null);
         setLoading(false);
       } catch (err) {
         if (cancelled) return;
         setError(
-          err instanceof ApiError ? describeError(err) : "Could not load drafts.",
+          err instanceof ApiError
+            ? describeError(err)
+            : "Could not load drafts.",
         );
         setLoading(false);
       }
@@ -145,38 +188,40 @@ function DraftsQueue() {
     };
   }, [conferenceId]);
 
+  const drafted = rows.filter(
+    (r) => r.kind === "draft" && r.draft.status === "draft",
+  ).length;
+  const approved = rows.filter(
+    (r) => r.kind === "draft" && r.draft.status === "approved",
+  ).length;
   const total = rows.length;
-  const drafted = rows.filter((r) => r.draft.status === "draft").length;
-  const approved = rows.filter((r) => r.draft.status === "approved").length;
 
   const visible = rows.filter((r) => {
     if (filter === "all") return true;
+    if (r.kind !== "draft") return filter === "draft";
     return r.draft.status === filter;
   });
-
-  const headline =
-    total === 0
-      ? "Make the first move."
-      : total === 1
-        ? "Make the first move."
-        : "Make the first move.";
 
   const sub =
     total === 0
       ? "No drafts yet. Pick someone to write to."
       : `${total} ${total === 1 ? "draft" : "drafts"} ready. Nothing sends without you.`;
 
+  // First Drafted row index for highlight.
+  const firstDraftedIndex = visible.findIndex(
+    (r) => r.kind === "draft" && r.draft.status === "draft",
+  );
+
   return (
     <PhoneShell>
       <div className="flex flex-1 flex-col gap-[14px] px-5 pt-3">
         <div className="flex flex-col gap-2">
           <h1 className="font-serif text-[36px] leading-none tracking-[-0.36px] text-ink">
-            {headline}
+            Make the first move.
           </h1>
           <p className="text-[14px] text-muted">{sub}</p>
         </div>
 
-        {/* Segmented filter */}
         <div className="flex w-full items-center gap-[2px] rounded-full bg-subtle p-[3px]">
           <FilterTab
             label={`All ${total}`}
@@ -202,7 +247,9 @@ function DraftsQueue() {
         ) : null}
 
         {loading ? (
-          <p className="pt-6 text-center text-[13px] text-muted">Loading drafts…</p>
+          <p className="pt-6 text-center text-[13px] text-muted">
+            Loading drafts…
+          </p>
         ) : visible.length === 0 ? (
           <EmptyState
             total={total}
@@ -211,53 +258,82 @@ function DraftsQueue() {
           />
         ) : (
           <div className="flex w-full flex-col overflow-hidden rounded-[12px] border border-line bg-card">
-            {visible.map((row, idx) => (
-              <button
-                key={row.draft.id}
-                type="button"
-                onClick={() => router.push(`/drafts/${row.draft.id}`)}
-                className={
-                  "flex w-full items-center gap-3 bg-card px-3.5 py-3 text-left hover:bg-subtle/50 " +
-                  (idx === 0 ? "" : "border-t border-line")
-                }
-              >
-                <Avatar
-                  name={row.personName}
-                  src={row.photoUrl ?? undefined}
-                  size="md"
-                />
-                <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                  <p className="truncate text-[14px] text-ink">
-                    {row.personName}
-                  </p>
-                  <p className="truncate text-[12px] text-muted">
-                    {row.personTitle ?? row.draft.subject}
-                  </p>
-                  <div className="flex items-center gap-1.5 pt-0.5">
-                    <Chip
-                      tone={kindTone[row.draft.kind]}
-                      className="!px-2.5 !py-[3px] !text-[11px]"
-                    >
-                      {kindLabel[row.draft.kind]}
-                    </Chip>
-                    <Chip
-                      tone={statusTone[row.draft.status]}
-                      className="!px-2.5 !py-[3px] !text-[11px]"
-                    >
-                      {statusLabel[row.draft.status]}
-                    </Chip>
+            {visible.map((row, idx) => {
+              const highlight = idx === firstDraftedIndex;
+              const status: StatusKey =
+                row.kind === "draft" ? statusForDraft(row.draft) : "needs_note";
+              const divider = idx === 0 ? "" : "border-t border-line";
+              const bg = highlight ? "bg-cream" : "bg-card";
+              const onClick =
+                row.kind === "draft"
+                  ? () => router.push(`/drafts/${row.draft.id}`)
+                  : () =>
+                      router.push(
+                        `/person/${encodeURIComponent(row.personId)}/note`,
+                      );
+              return (
+                <button
+                  key={row.id}
+                  type="button"
+                  onClick={onClick}
+                  className={`flex w-full items-center gap-3 pl-3.5 pr-3 py-3 text-left ${bg} ${divider}`}
+                >
+                  <Avatar
+                    name={row.personName}
+                    src={row.photoUrl ?? undefined}
+                    size="md"
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                    <p className="truncate text-[14px] text-ink">
+                      {row.personName}
+                    </p>
+                    <p className="truncate text-[12px] text-muted">
+                      {row.subtitle}
+                    </p>
+                    <div className="pt-0.5">
+                      <StatusChip
+                        status={status}
+                        highlighted={highlight && status === "drafted"}
+                      />
+                    </div>
                   </div>
-                </div>
-                <span aria-hidden className="text-[18px] text-faint">
-                  ›
-                </span>
-              </button>
-            ))}
+                  <span aria-hidden className="text-[18px] text-faint">
+                    ›
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
       <AppNav />
     </PhoneShell>
+  );
+}
+
+function StatusChip({
+  status,
+  highlighted,
+}: {
+  status: StatusKey;
+  highlighted?: boolean;
+}) {
+  // Status chips are always neutral; emoji carries semantic color.
+  // The highlighted "next action" row uses a white pill against the cream row.
+  const bg = highlighted ? "bg-card" : "bg-subtle";
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-[2px] text-[11px] font-medium text-ink ${bg}`}
+    >
+      <Image
+        src={statusEmoji[status]}
+        alt=""
+        width={14}
+        height={14}
+        aria-hidden
+      />
+      <span>{statusLabel[status]}</span>
+    </span>
   );
 }
 
@@ -270,16 +346,27 @@ function FilterTab({
   active: boolean;
   onClick: () => void;
 }) {
+  if (active) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex-1 rounded-full py-2 text-[13px] text-ink"
+      >
+        <Chip
+          tone="gradient"
+          className="!px-3 !py-[6px] !text-[13px] !font-medium"
+        >
+          {label}
+        </Chip>
+      </button>
+    );
+  }
   return (
     <button
       type="button"
       onClick={onClick}
-      className={
-        "flex-1 rounded-full py-2 text-[13px] transition-colors " +
-        (active
-          ? "bg-card text-ink"
-          : "bg-transparent text-muted font-medium")
-      }
+      className="flex-1 rounded-full py-2 text-[13px] font-medium text-muted"
     >
       {label}
     </button>
@@ -316,9 +403,7 @@ function EmptyState({
   }
   return (
     <p className="pt-6 text-center text-[13px] text-muted">
-      {filter === "approved"
-        ? "Nothing approved yet."
-        : "Nothing in draft."}
+      {filter === "approved" ? "Nothing approved yet." : "Nothing in draft."}
     </p>
   );
 }
