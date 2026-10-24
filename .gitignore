@@ -11,3 +11,6 @@ dist/
 backend/data/
 uploads/
 *.log
+
+# Agent worktrees created by Claude Code — never commit.
+.claude/
