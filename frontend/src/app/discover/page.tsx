@@ -64,7 +64,7 @@ function DiscoverDeck() {
       <h1 className="font-serif text-[29px] leading-[1.3] tracking-[-0.01em]">{capture ? "Who did you meet?" : reviewSkipped ? "Another look." : "Who’s in the room?"}</h1>
       {capture && <p className="text-sm text-muted">Find the person, then tap Add a note.</p>}
       <article className="overflow-hidden rounded-xl border border-line bg-card">
-        <Link href={`/person/${encodeURIComponent(current.id)}`} className="relative block h-[280px]">
+        <Link href={`/person/${encodeURIComponent(current.id)}`} className="relative block h-[clamp(160px,32dvh,280px)]">
           <Portrait key={current.id} name={current.name} src={current.photo_url} />
           <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-transparent to-black/75" />
           <span className="absolute top-3 left-3 max-w-[70%] truncate rounded-full bg-card px-2.5 py-1 text-[11px]">{current.data_mode === "fixture" ? "Sample data" : current.event_role || "Listed on event page"}</span>

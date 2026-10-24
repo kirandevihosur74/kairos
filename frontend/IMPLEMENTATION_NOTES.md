@@ -4,7 +4,8 @@ Frontend changes follow the mobile flow board in Figma file `mouA5TnOzdAVAhGc6oK
 
 ## Implemented
 
-- 390px mobile shell and local Figma navigation assets.
+- Viewport-height 390px mobile shell, safe-area-aware fixed bottom navigation, and local Figma navigation assets. Long content scrolls inside the shell; short screens do not create unnecessary page scrolling.
+- Compact onboarding: import summary first, required review fields next, optional profile details expandable; actions remain reachable near the bottom.
 - Discovery portrait cards, persisted triage decisions, resume from unsorted people, skipped review, note entry, and profile/event links.
 - Lead sheet with To meet / Met / Follow up tabs, search, sorting, card/table views, CSV export, and restoring skipped people. Follow up means met with no approved draft; approved means user approved/copy-ready, not sent.
 - Event list grouped by supplied event dates; selected event persists and clears the previous selected person. No invented event dates or live status.
