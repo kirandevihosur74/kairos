@@ -10,7 +10,10 @@ import { useSession } from "@/lib/session";
 import { describeError } from "../../../onboarding/draft";
 
 function GraphView() {
-  const { id } = useParams<{ id: string }>();
+  // Route params arrive URL-encoded ("conference_x%3Aperson"); decode so links built from the id are
+  // not encoded twice (%253A), which breaks the back link and the Why/Memory tabs.
+  const { id: rawId } = useParams<{ id: string }>();
+  const id = decodeURIComponent(rawId);
   const params = useSearchParams();
   const memoryTab = params.get("tab") === "memory";
   const router = useRouter();
