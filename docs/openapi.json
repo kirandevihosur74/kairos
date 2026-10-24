@@ -387,6 +387,51 @@
         }
       }
     },
+    "/api/v1/conferences": {
+      "get": {
+        "summary": "List Conferences",
+        "description": "Every event the user added, newest first, with per-event progress counts for a home screen.",
+        "operationId": "list_conferences_api_v1_conferences_get",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/people": {
       "get": {
         "summary": "Get People",
@@ -1013,15 +1058,24 @@
             "title": "Url"
           },
           "name": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name",
-            "default": "Demo conference"
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           },
           "data_mode": {
             "type": "string",
-            "const": "fixture",
+            "enum": [
+              "fixture",
+              "live"
+            ],
             "title": "Data Mode",
             "default": "fixture"
           }

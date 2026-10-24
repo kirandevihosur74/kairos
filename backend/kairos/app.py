@@ -2,6 +2,7 @@ import io
 import json
 import logging
 import secrets
+from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
@@ -181,6 +182,7 @@ def create_app(settings: Settings | None = None):
                     stale=stale,
                     collected_at=event["collected_at"],
                     start_at=event["start_at"],
+                    end_at=event["end_at"],
                     city=event["city"],
                 )
             else:
@@ -201,6 +203,41 @@ def create_app(settings: Settings | None = None):
     @app.get(api + "/conference/{cid}/status", dependencies=protected)
     def status(cid: str):
         return require(store(), "conference", cid)
+
+    @app.get(api + "/conferences", dependencies=protected)
+    def list_conferences():
+        """Every event the user added, newest first, with per-event progress counts for a home screen."""
+        s = store()
+        interesting, met, pending = Counter(), {}, Counter()
+        for t in s.all("triage"):
+            if t["decision"] == "interesting":
+                interesting[t["conference_id"]] += 1
+        for n in s.all("note"):
+            met.setdefault(n["conference_id"], set()).add(n["person_id"])
+        for d in s.all("draft"):
+            if d["status"] == "draft":
+                pending[d["conference_id"]] += 1
+        items = [
+            {
+                "conference_id": c["id"],
+                "name": c["name"],
+                "url": c["url"],
+                "stage": c["stage"],
+                "created_at": c["created_at"],
+                "start_at": c.get("start_at"),
+                "end_at": c.get("end_at"),
+                "data_mode": c["data_mode"],
+                "stale": c["stale"],
+                "people_found": c["people_found"],
+                "counts": {
+                    "interesting": interesting[c["id"]],
+                    "met": len(met.get(c["id"], ())),
+                    "drafts_pending": pending[c["id"]],
+                },
+            }
+            for c in s.all("conference")
+        ]
+        return sorted(items, key=lambda c: (c["created_at"], c["conference_id"]), reverse=True)
 
     @app.get(api + "/people", dependencies=protected)
     def get_people(

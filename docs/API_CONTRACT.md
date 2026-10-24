@@ -24,6 +24,7 @@ Implemented base URL: `http://127.0.0.1:8000/api/v1`. Interactive documentation:
 | POST /onboarding/resume | Multipart file | Same preview; text-based PDF only |
 | POST /conference | url, name?, data_mode: fixture | 201: conference_id, stage, people_found, status_url |
 | GET /conference/{id}/status | — | Persisted conference status |
+| GET /conferences | — | All of the user's events, newest first: conference_id, name, url, stage, created_at, start_at, end_at, data_mode, stale, people_found, counts {interesting, met, drafts_pending} |
 | GET /people | conference_id, triage? | Ranked card array |
 | GET /people/{id} | conference_id | Card including notes, even if skipped |
 | GET /people/{id}/graph | conference_id | sentence, nodes, edges |
@@ -75,3 +76,7 @@ Fixture loading is synchronous and returns 201 with stage ready, not the earlier
 422: invalid input or missing job data; 404: unknown or cross-conference IDs; 409: missing onboarding/note or not-ready conference; 413: oversized upload; 401: missing/wrong configured API key; 503: graph connection errors. Error bodies use `detail`.
 
 Local demo only: CORS is configured for one exact frontend origin; it is not authentication. Optional X-API-Key is a shared team credential. Multi-user sessions, per-user authorization, deletion/export controls, and hardened document parsing are prerequisites to public deployment.
+
+### Event list
+
+`counts.interesting` = people triaged interesting; `counts.met` = distinct people with at least one meeting note; `counts.drafts_pending` = drafts not yet approved. `start_at`/`end_at` come from the event page for live Luma events and are null for fixture events, so a client can bucket now/upcoming/past only when dates exist.

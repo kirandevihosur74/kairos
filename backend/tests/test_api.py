@@ -220,3 +220,27 @@ def test_text_pdf_import(client):
     assert response.status_code == 200, response.text
     assert "python" in response.json()["suggested_profile"]["skills"]
     assert client.get("/api/v1/profile").status_code == 409
+
+
+def test_conferences_list_with_counts(client):
+    assert client.get("/api/v1/conferences").json() == []
+    cid, people = seed(client)
+    other = client.post("/api/v1/conference", json={"url": "https://example.invalid/other"}).json()["conference_id"]
+    first, second = people[0]["id"], people[1]["id"]
+    for pid in (first, second):
+        triage = {"conference_id": cid, "person_id": pid, "decision": "interesting"}
+        assert client.post("/api/v1/triage", json=triage).status_code == 200
+    for _ in range(2):  # two notes about one person count as one person met
+        client.post("/api/v1/met", json={"conference_id": cid, "person_id": first, "note": "Talked about queues."})
+    pending = client.post(f"/api/v1/followups/{first}/draft", json={"conference_id": cid, "kind": "follow_up"})
+    approved = client.post(f"/api/v1/followups/{first}/draft", json={"conference_id": cid, "kind": "follow_up"}).json()
+    assert pending.status_code == 201
+    edit = {key: approved[key] for key in ("subject", "body", "linkedin_message")}
+    assert client.post(f"/api/v1/followups/{approved['id']}/approve", json=edit).status_code == 200
+
+    items = {c["conference_id"]: c for c in client.get("/api/v1/conferences").json()}
+    assert set(items) == {cid, other}
+    assert items[cid]["counts"] == {"interesting": 2, "met": 1, "drafts_pending": 1}
+    assert items[other]["counts"] == {"interesting": 0, "met": 0, "drafts_pending": 0}
+    assert items[cid]["people_found"] == len(people)
+    assert {"name", "url", "stage", "created_at", "start_at", "end_at", "data_mode"} <= set(items[cid])
