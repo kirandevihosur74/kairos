@@ -8,7 +8,9 @@ import {
   Button,
   Card,
   Chip,
+  FactList,
   PhoneShell,
+  ReachabilityPill,
   RequireProfile,
   SectionLabel,
   useToast,
@@ -17,10 +19,10 @@ import {
   ApiError,
   api,
   type GraphNode,
-  type PersonCard,
   type TriageDecision,
   type WhyPath,
 } from "@/lib/api";
+import { enrichMany, type EnrichedCard } from "@/lib/data/mocks";
 import { useSession } from "@/lib/session";
 
 export default function DiscoverPage() {
@@ -50,7 +52,7 @@ function DiscoverDeck() {
 
   const isSheetView = searchParams.get("view") === "sheet";
 
-  const [people, setPeople] = useState<PersonCard[] | null>(null);
+  const [people, setPeople] = useState<EnrichedCard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [pending, setPending] = useState(false);
@@ -69,7 +71,7 @@ function DiscoverDeck() {
     api.listPeople(conferenceId).then(
       (list) => {
         if (cancelled) return;
-        setPeople(list);
+        setPeople(enrichMany(list));
       },
       (err) => {
         if (cancelled) return;
@@ -112,7 +114,9 @@ function DiscoverDeck() {
         const updated = await api.triage(conferenceId, personId, decision);
         setPeople((prev) =>
           prev
-            ? prev.map((p) => (p.id === personId ? { ...p, ...updated } : p))
+            ? prev.map((p) =>
+                p.id === personId ? { ...p, triage: updated.decision } : p,
+              )
             : prev,
         );
         showToast(
@@ -199,7 +203,7 @@ function DiscoverDeck() {
 /* -------------------------------------------------------------------------- */
 
 interface PersonDeckCardProps {
-  card: PersonCard;
+  card: EnrichedCard;
   index: number;
   total: number;
   disabled: boolean;
@@ -247,10 +251,22 @@ function PersonDeckCard({
         {/* Header strip */}
         <div className="relative h-[170px] bg-subtle">
           <div className="absolute left-3 top-3">
-            <Chip tone="outline">Sample data</Chip>
+            <Chip tone="outline">
+              {card.verified_match ? "✓ Verified match" : "Sample data"}
+            </Chip>
           </div>
+          {card.reachability_tag ? (
+            <div className="absolute right-3 top-3">
+              <ReachabilityPill value={card.reachability_tag} size="sm" />
+            </div>
+          ) : null}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <Avatar name={card.name} src={card.photo_url} size="ring" />
+            <Avatar
+              name={card.name}
+              src={card.photo_url}
+              size="ring"
+              strongFit={card.score === 1.0}
+            />
           </div>
           {matchChipLabel ? (
             <div className="absolute bottom-3 right-3">
@@ -289,6 +305,30 @@ function PersonDeckCard({
             </div>
           ) : null}
 
+          {card.three_facts.length > 0 ? (
+            <div className="flex flex-col gap-2 pt-1">
+              <SectionLabel>Three things</SectionLabel>
+              <FactList facts={card.three_facts} />
+            </div>
+          ) : null}
+
+          {card.warm_intro_hint ? (
+            <p className="text-sm text-muted">
+              <span>Mention · </span>
+              <span className="text-ink">
+                {card.warm_intro_hint.connector}
+              </span>
+              {card.warm_intro_hint.via ? (
+                <>
+                  <span>, your connection at </span>
+                  <span className="text-ink">
+                    {card.warm_intro_hint.via}
+                  </span>
+                </>
+              ) : null}
+            </p>
+          ) : null}
+
           {card.next_step ? (
             <div className="flex flex-col gap-2">
               <SectionLabel>Next step</SectionLabel>
@@ -309,7 +349,7 @@ function PersonDeckCard({
       {/* Actions */}
       <div className="mt-6 flex items-center gap-3">
         <Button
-          variant="secondary"
+          variant="outline"
           size="lg"
           fullWidth
           disabled={disabled}

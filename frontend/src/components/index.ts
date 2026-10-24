@@ -11,8 +11,14 @@ export { Chip } from "./Chip";
 export type { ChipProps } from "./Chip";
 export { Logo } from "./Logo";
 export type { LogoProps } from "./Logo";
+export { FactList } from "./FactList";
+export type { FactListProps } from "./FactList";
+export { PersonCard } from "./PersonCard";
+export type { PersonCardProps } from "./PersonCard";
 export { PhoneShell } from "./PhoneShell";
 export type { PhoneShellProps } from "./PhoneShell";
+export { ReachabilityPill } from "./ReachabilityPill";
+export type { ReachabilityPillProps } from "./ReachabilityPill";
 export {
   GoalProgress,
   MiniProgress,
