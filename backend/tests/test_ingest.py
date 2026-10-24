@@ -361,3 +361,24 @@ def test_photos_follow_card_layout_and_skip_people_without_one():
         ["Avery Example", "Casey Example", "Drew Example", "Eli Example"], [("https://x.example.com/judges", page)]
     )
     assert photos == {"Avery Example": "https://cdn.example.com/a.jpg", "Drew Example": "https://cdn.example.com/d.jpg"}
+
+
+def test_re_adding_a_live_event_refreshes_people_and_keeps_the_shortlist(live, monkeypatch):
+    client, fetcher, calls, settings = live
+    first = add_event(client).json()
+    avery = next(
+        p for p in client.get("/api/v1/people", params={"conference_id": first["id"]}).json() if p["name"] == "Avery Example"
+    )
+    client.post("/api/v1/triage", json={"conference_id": first["id"], "person_id": avery["id"], "decision": "interesting"})
+    # A snapshot written by an older parser is refetched, so people it missed (here: attendees) appear.
+    path = ingest.snapshot_path(settings.snapshot_dir, "https://luma.com/example")
+    old = json.loads(path.read_text())
+    old["people"] = [p for p in old["people"] if p["event_role"] != "attendee"]
+    old.pop("version", None)
+    path.write_text(json.dumps(old))
+    again = add_event(client).json()
+    assert again["conference_id"] == first["conference_id"]
+    assert again["people_found"] == 5 and len(calls) == 2
+    people = {p["name"]: p for p in client.get("/api/v1/people", params={"conference_id": first["id"], "triage": "all"}).json()}
+    assert people["Public Guest"]["event_role"] == "attendee"
+    assert people["Avery Example"]["triage"] == "interesting"  # same person id: the shortlist survives

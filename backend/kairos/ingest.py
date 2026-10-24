@@ -31,6 +31,9 @@ from .logs import event as log_event
 BRIGHTDATA_ENDPOINT = "https://api.brightdata.com/request"
 LUMA_HOSTS = {"luma.com", "www.luma.com", "lu.ma"}
 MAX_PAGE_BYTES = 5_000_000
+# Bump when parsing changes what a page yields (v2: photos and publicly listed attendees), so snapshots
+# written by an older parser are refetched instead of being reused for a day.
+SNAPSHOT_VERSION = 2
 RETRY_DELAY = 1.0
 EVENT_ROLES = ["speaker", "judge", "host", "organizer", "panelist", "mentor", "attendee", "moderator"]
 
@@ -520,8 +523,11 @@ def load_event(url, settings, collected_at):
         raise HTTPException(503, "Non-Luma event pages need AI extraction; set KAIROS_OPENAI_API_KEY")
     path = snapshot_path(settings.snapshot_dir, url)
     if path.exists() and time.time() - path.stat().st_mtime < settings.snapshot_max_age_hours * 3600:
-        log_event("ingest.snapshot.reused", url=url, snapshot=path.name)
-        return json.loads(path.read_text()), "cache"
+        cached = json.loads(path.read_text())
+        if cached.get("version", 1) >= SNAPSHOT_VERSION:
+            log_event("ingest.snapshot.reused", url=url, snapshot=path.name)
+            return cached, "cache"
+        log_event("ingest.snapshot.outdated", url=url, snapshot=path.name, version=cached.get("version", 1))
     try:
         if not settings.brightdata_api_key or not settings.brightdata_zone:
             raise FetchError("Bright Data is not configured")
@@ -554,6 +560,7 @@ def load_event(url, settings, collected_at):
             p["stale"] = True
         return event, "stale"
     path.parent.mkdir(parents=True, exist_ok=True)
+    event["version"] = SNAPSHOT_VERSION
     path.write_text(json.dumps(event, indent=1))
     log_event("ingest.done", url=url, people=len(event["people"]), snapshot=path.name)
     if not event["people"]:
