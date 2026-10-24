@@ -141,9 +141,19 @@ export interface Draft {
 }
 
 export interface HealthStatus {
+  status: string;
   storage: string;
-  fixtures: boolean;
-  templates: boolean;
+  single_user_demo: boolean;
+  ingestion: string;
+  draft_generation: string;
+}
+
+export interface TriageResult {
+  id: string;
+  conference_id: string;
+  person_id: string;
+  decision: TriageDecision;
+  updated_at: string;
 }
 
 export interface ApiErrorBody {
@@ -259,7 +269,7 @@ export const api = {
     }),
 
   triage: (conferenceId: string, personId: string, decision: TriageDecision) =>
-    request<PersonCard>("/triage", {
+    request<TriageResult>("/triage", {
       method: "POST",
       body: JSON.stringify({
         conference_id: conferenceId,
