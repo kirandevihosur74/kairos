@@ -40,8 +40,8 @@ function RecapView() {
     }
     let cancelled = false;
     Promise.all([
-      api.listPeople(conferenceId, "interesting"),
-      api.listDrafts(conferenceId),
+      api.listPeople(conferenceId, "all"),
+      api.listDrafts(conferenceId, "draft"),
       api.getConferenceStatus(conferenceId),
     ]).then(
       ([people, drafts, conference]) => {
@@ -80,11 +80,11 @@ function RecapView() {
 
   const people = state.kind === "ready" ? state.people : [];
   const met = people.filter((p) => p.met !== null);
-  const notMet = people.filter((p) => p.met === null);
+  const notMet = people.filter((p) => p.met === null && p.triage === "interesting");
   const draftsReady = state.kind === "ready" ? state.drafts : 0;
   const eventName = (state.kind === "ready" && state.eventName) || "Your event";
 
-  const total = people.length;
+  const total = met.length + notMet.length;
   const metCount = met.length;
   const progress = Math.min(metCount, DAILY_GOAL);
 

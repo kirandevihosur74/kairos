@@ -18,14 +18,7 @@ const nextConfig: NextConfig = {
     proxyTimeout: 150_000,
   },
   partialPrefetching: true,
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
+  turbopack: { root: process.cwd() },
 };
 
 export default nextConfig;

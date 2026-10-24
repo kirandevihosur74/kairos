@@ -1,5 +1,7 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
+
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -22,8 +24,6 @@ type LoadState = "loading" | "ready" | "error";
 
 function PersonPageRoute() {
   const params = useParams<{ id: string }>();
-  // Route params arrive URL-encoded ("conference_x%3Aperson"); decode so the id is not encoded twice
-  // when it is stored for the mic button and put back into a URL.
   const id = params?.id ? decodeURIComponent(params.id) : undefined;
   if (!id) return null;
   return (
@@ -121,12 +121,12 @@ function PersonPageInner({ id }: { id: string }) {
   return (
     <PhoneShell>
       <div className="flex flex-1 flex-col gap-5 px-5 pb-10 pt-2">
-        <TopBar onBack={() => router.back()} />
+        <TopBar onBack={() => router.push("/sheet")} />
 
         <PersonHeader person={person} />
 
         <section className="flex flex-col gap-2">
-          <SectionLabel>Why them</SectionLabel>
+          <div className="flex items-center justify-between"><SectionLabel>Why them</SectionLabel><Link href={`/person/${encodeURIComponent(person.id)}/graph`} className="text-xs text-alert">View graph →</Link></div>
           <Card radius="lg" padded className="flex flex-col gap-4">
             <WhyPathDiagram why={person.why} personName={person.name} />
           </Card>
@@ -178,12 +178,13 @@ function PersonPageInner({ id }: { id: string }) {
           </section>
         ) : null}
 
+        <Link href={`/person/${encodeURIComponent(person.id)}/graph?tab=memory`} className="flex items-center justify-between rounded-xl bg-subtle px-4 py-3 text-sm">What Kairos remembers <span>→</span></Link>
+
         {conferenceId ? <MemorySection personId={person.id} conferenceId={conferenceId} /> : null}
 
         <NotesHistory notes={person.notes} />
 
-        {/* Sticky above the floating bottom nav, which otherwise covers these buttons. */}
-        <div className="sticky bottom-[92px] z-20 flex flex-col gap-3 bg-paper/95 pb-2 pt-2 backdrop-blur">
+        <div className="app-actions flex flex-col gap-3 pb-2">
           <Link href={`/person/${encodeURIComponent(person.id)}/note`} className="w-full">
             <Button variant="primary" size="lg" fullWidth>
               Capture a note
@@ -211,9 +212,7 @@ function TopBar({ onBack }: { onBack: () => void }) {
       >
         ‹ Shortlist
       </button>
-      <span className="font-serif text-[18px] tracking-[-0.01em] text-ink">
-        kairos
-      </span>
+      <Logo width={100} />
     </div>
   );
 }
@@ -221,16 +220,13 @@ function TopBar({ onBack }: { onBack: () => void }) {
 function PersonHeader({ person }: { person: PersonCard }) {
   const subtitle = [person.title, person.company].filter(Boolean).join(" · ");
   const sampleData = person.data_mode === "fixture";
-  // Same measure as the Discover card: shared topics out of the interests in the user's profile.
   const matched = person.why.nodes.filter((n) => n.type === "Topic").length;
   const totalInterests = person.score > 0 ? Math.round(matched / person.score) : null;
-  const matchLabel = totalInterests
-    ? `Matches ${matched} of ${totalInterests} interests`
-    : "No shared interests yet";
+  const matchLabel = totalInterests ? `Matches ${matched} of ${totalInterests} interests` : "No shared interests yet";
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-start gap-4">
-        <Avatar name={person.name} src={person.photo_url} size="ring" />
+      <div className="flex items-start gap-3.5">
+        <Avatar name={person.name} src={person.photo_url} size="xl" />
         <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
           <h1 className="font-serif text-[28px] leading-[1.05] text-ink">
             {person.name}
@@ -241,8 +237,8 @@ function PersonHeader({ person }: { person: PersonCard }) {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {person.met ? <Chip tone="on">Met</Chip> : null}
         {person.triage === "interesting" ? <Chip tone="on">Interesting</Chip> : null}
+        {person.met ? <Chip tone="on">Met</Chip> : null}
         {person.triage === "not_interesting" ? <Chip tone="outline">Skipped</Chip> : null}
         {sampleData ? <Chip tone="outline">Sample data</Chip> : null}
         <Chip tone="outline">{matchLabel}</Chip>

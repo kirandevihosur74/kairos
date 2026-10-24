@@ -120,7 +120,7 @@ export function toProfileInput(draft: Draft): ProfileInput {
     skills: dedupe(draft.skills),
     background: draft.background.trim(),
     location_preferences: dedupe(draft.location_preferences),
-    linkedin_url: draft.linkedin_url.trim() || null,
+    linkedin_url: draft.linkedin_url.trim() ? (/^https?:\/\//i.test(draft.linkedin_url.trim()) ? draft.linkedin_url.trim() : `https://${draft.linkedin_url.trim()}`) : null,
     import_id: draft.import_id,
   };
 }

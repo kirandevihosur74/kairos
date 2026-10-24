@@ -1,10 +1,11 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
+
 import { useRouter } from "next/navigation";
-import { type ChangeEvent, useEffect, useRef, useState } from "react";
-import { Button, PhoneShell, SectionLabel } from "@/components";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { Button, PhoneShell } from "@/components";
 import { api } from "@/lib/api";
-import { ChipField } from "./ChipField";
 import {
   applyPreview,
   describeError,
@@ -31,22 +32,15 @@ export default function OnboardingImportPage() {
     writeStoredDraft(next);
   };
 
-  // Editing an existing profile: start from the saved one, not a blank form.
+  // Reopening onboarding keeps the saved profile editable after a reset or return visit.
   useEffect(() => {
     if (draft.name || draft.interests.length) return;
     let cancelled = false;
-    api.getProfile().then(
-      (profile) => {
-        if (!cancelled) persist(profileToDraft(profile));
-      },
-      () => {
-        // No profile yet (409): first-time onboarding starts blank.
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-    // Runs once on open; later edits must not be overwritten by the saved profile.
+    api.getProfile().then((profile) => {
+      if (!cancelled) persist(profileToDraft(profile));
+    }, () => {});
+    return () => { cancelled = true; };
+    // Hydrate once; later edits must not be overwritten.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -101,9 +95,9 @@ export default function OnboardingImportPage() {
 
   return (
     <PhoneShell withNavSpacer={false}>
-      <div className="flex flex-1 flex-col gap-6 px-5 pb-10 pt-2">
+      <div className="flex flex-1 flex-col gap-5 px-5 pb-0 pt-2">
         <div className="flex items-start justify-between gap-3 pt-1">
-          <p className="font-serif text-[24px] leading-none text-ink">kairos</p>
+          <Logo />
           <p className="pt-2 text-[13px] text-muted">Step 1 of 3</p>
         </div>
 
@@ -177,7 +171,7 @@ export default function OnboardingImportPage() {
               <textarea
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
-                rows={5}
+                rows={3}
                 placeholder="Paste a quick summary of your experience, roles you want, and what you work on."
                 className="rounded-[12px] border border-line bg-card px-4 py-3 text-[15px] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
               />
@@ -199,63 +193,18 @@ export default function OnboardingImportPage() {
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-4">
-          <SectionLabel>
-            {hasPreview
-              ? "Suggested from your resume · confirm or remove"
-              : "Fill these in — or import above"}
-          </SectionLabel>
+        {hasPreview && (
+          <section className="rounded-xl border border-line bg-card p-4">
+            <h2 className="text-[13px] font-semibold">Ready to review</h2>
+            {draft.name && <p className="mt-2 font-serif text-2xl">{draft.name}</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {draft.skills.slice(0, 6).map((skill) => <span key={skill} className="rounded-full bg-cream px-3 py-1.5 text-xs">{skill}</span>)}
+            </div>
+            <p className="mt-3 text-[13px] leading-relaxed text-muted">Review your roles, interests, and profile on the next step. Nothing is saved until you confirm.</p>
+          </section>
+        )}
 
-          <div className="flex flex-col gap-2">
-            <p className="text-[13px] font-medium text-ink">Name</p>
-            <input
-              value={draft.name}
-              onChange={(e) => persist({ ...draft, name: e.target.value })}
-              placeholder="Your name"
-              className="rounded-[12px] border border-line bg-card px-4 py-3 text-[15px] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
-            />
-          </div>
-
-          <ChipField
-            label="Target roles"
-            values={draft.target_roles}
-            onChange={(target_roles) => persist({ ...draft, target_roles })}
-            placeholder="e.g. Backend engineer"
-          />
-
-          <ChipField
-            label="Interests"
-            helper="used to rank who you meet"
-            values={draft.interests}
-            onChange={(interests) => persist({ ...draft, interests })}
-            placeholder="e.g. distributed systems"
-          />
-
-          <ChipField
-            label="Skills"
-            values={draft.skills}
-            onChange={(skills) => persist({ ...draft, skills })}
-            placeholder="e.g. python, fastapi"
-          />
-
-          <div className="flex flex-col gap-2">
-            <p className="text-[13px] font-medium text-ink">About you</p>
-            <textarea
-              value={draft.background}
-              onChange={(e) => persist({ ...draft, background: e.target.value })}
-              rows={3}
-              placeholder="One line on what you build and where you want to go."
-              className="rounded-[12px] border border-line bg-card px-4 py-3 text-[14px] leading-[1.4] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
-            />
-          </div>
-
-          <p className="text-[12px] text-faint">
-            Keyword matching only, no AI guessing. You stay in control of what
-            ranks.
-          </p>
-        </div>
-
-        <div className="mt-auto flex flex-col gap-3 pt-6">
+        <div className="app-actions mt-auto flex flex-col gap-3">
           <Button variant="secondary" size="lg" fullWidth onClick={onEnterManually}>
             Enter manually
           </Button>

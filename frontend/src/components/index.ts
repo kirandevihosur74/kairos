@@ -1,4 +1,7 @@
 export { AppNav } from "./AppNav";
+export { Logo } from "./Logo";
+export { DesignIcon } from "./DesignIcon";
+export { Portrait } from "./Portrait";
 export { Avatar } from "./Avatar";
 export type { AvatarProps } from "./Avatar";
 export { BottomNav } from "./BottomNav";

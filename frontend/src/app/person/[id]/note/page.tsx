@@ -1,5 +1,7 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
+
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
@@ -86,7 +88,7 @@ function NoteCaptureInner({ id }: { id: string }) {
     try {
       await api.saveMetNote(conferenceId, person.id, text.trim());
       showToast(`Note saved to ${firstName(person.name)}'s memory`);
-      router.replace(`/person/${encodeURIComponent(person.id)}`);
+      router.replace("/today");
     } catch (err) {
       setSaving(false);
       setError(
@@ -154,9 +156,7 @@ function NoteCaptureInner({ id }: { id: string }) {
           >
             ‹ Back
           </button>
-          <span className="font-serif text-[18px] tracking-[-0.01em] text-ink">
-            kairos
-          </span>
+          <Logo width={100} />
         </div>
 
         <div className="flex items-center gap-3">
@@ -174,6 +174,7 @@ function NoteCaptureInner({ id }: { id: string }) {
         <div className="flex flex-col gap-2">
           <SectionLabel>Note</SectionLabel>
           <textarea
+              maxLength={4000}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="They mentioned flaky tests cost about a day every sprint. Wants a demo next week."
@@ -198,7 +199,7 @@ function NoteCaptureInner({ id }: { id: string }) {
         {error ? <p className="text-[13px] text-alert">{error}</p> : null}
 
         {/* Sticky above the floating bottom nav. */}
-        <div className="sticky bottom-[92px] z-20 mt-auto flex flex-col gap-3 bg-paper/95 pb-2 pt-3 backdrop-blur">
+        <div className="app-actions mt-auto flex flex-col gap-3 bg-paper/95 pb-2 pt-3 backdrop-blur">
           <Button
             type="submit"
             variant="primary"

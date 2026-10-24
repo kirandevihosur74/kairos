@@ -35,6 +35,10 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
+
+  button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
+  button:not(:disabled), a { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--color-amber); outline-offset: 3px; }
 }
 
 @utility bg-spectrum {
@@ -57,4 +61,23 @@
   );
   background-clip: text;
   color: transparent;
+}
+
+/* Reserve exactly the fixed navigation height instead of a large empty spacer. */
+:root {
+  --app-nav-height: calc(57px + max(8px, env(safe-area-inset-bottom, 0px)));
+}
+
+.app-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  flex-shrink: 0;
+  background: var(--color-paper);
+  padding-top: 12px;
+}
+
+/* Keep typing from zooming the page on mobile Safari. */
+@media (max-width: 600px) {
+  input, textarea, select { font-size: 16px; }
 }

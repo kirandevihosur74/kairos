@@ -1,8 +1,11 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
+
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Button, PhoneShell } from "@/components";
+import { Button, PhoneShell, RequireProfile } from "@/components";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { describeError } from "../onboarding/draft";
@@ -43,7 +46,7 @@ function ArrowIcon() {
   );
 }
 
-export default function AddEventPage() {
+function AddEventForm() {
   const router = useRouter();
   const { setConferenceId } = useSession();
   const [url, setUrl] = useState("");
@@ -64,10 +67,11 @@ export default function AddEventPage() {
         name.trim() || undefined,
         "live",
       );
+      if (conference.stage !== "ready") throw new Error(conference.error || "This event is not ready yet. Try adding it again shortly.");
       setConferenceId(conference.id);
       router.push("/discover");
     } catch (err) {
-      setError(describeError(err, "Could not add that event."));
+      setError(describeError(err, err instanceof Error ? err.message : "Could not add that event."));
     } finally {
       setSubmitting(false);
     }
@@ -79,15 +83,8 @@ export default function AddEventPage() {
         onSubmit={onSubmit}
         className="flex flex-1 flex-col gap-6 px-5 pb-10 pt-3"
       >
-        <div className="flex items-center gap-2">
-          <span
-            aria-hidden
-            className="inline-block h-[18px] w-[18px] rounded-full border-[1.5px] border-ink"
-          />
-          <p className="font-serif text-[23px] leading-none tracking-[-0.01em] text-ink">
-            kairos
-          </p>
-        </div>
+        <div className="flex items-center justify-between"><Link href="/events" className="text-sm text-alert">‹ Your events</Link><span className="text-xs text-muted">Add an event</span></div>
+        <Logo />
 
         <h1 className="font-serif text-[32px] leading-[1.05] tracking-[-0.01em] text-ink">
           Where are you going next?
@@ -97,6 +94,7 @@ export default function AddEventPage() {
           <div className="flex flex-1 items-center gap-2.5 rounded-[10px] border-[1.5px] border-ink bg-card px-3.5 py-3">
             <LinkIcon />
             <input
+              aria-label="Event URL"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               inputMode="url"
@@ -122,6 +120,8 @@ export default function AddEventPage() {
             Name · optional
           </label>
           <input
+            aria-label="Event name"
+            maxLength={200}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Patch the Conference"
@@ -173,3 +173,5 @@ export default function AddEventPage() {
     </PhoneShell>
   );
 }
+
+export default function AddEventPage() { return <RequireProfile><AddEventForm /></RequireProfile>; }

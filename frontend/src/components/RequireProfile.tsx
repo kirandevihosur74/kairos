@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiError, api, type Profile } from "@/lib/api";
+import { PhoneShell } from "./PhoneShell";
+import { LoadMessage } from "./LoadMessage";
 
 interface RequireProfileProps {
   children: ReactNode | ((profile: Profile) => ReactNode);
@@ -11,9 +13,11 @@ interface RequireProfileProps {
 export function RequireProfile({ children }: RequireProfileProps) {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "redirect">(
+  const [status, setStatus] = useState<"loading" | "ready" | "redirect" | "error">(
     "loading",
   );
+
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,21 +34,16 @@ export function RequireProfile({ children }: RequireProfileProps) {
           router.replace("/onboarding");
           return;
         }
-        // Other errors — leave the loading state visible; the user can retry.
-        console.error("Failed to load profile", err);
+        setStatus("error");
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, retry]);
 
   if (status !== "ready" || !profile) {
-    return (
-      <div className="flex flex-1 items-center justify-center py-24">
-        <span className="text-sm text-muted">Loading…</span>
-      </div>
-    );
+    return <PhoneShell withNavSpacer={false}><LoadMessage loading={status !== "error"} error={status === "error" ? "Could not connect to Kairos. Check the backend and try again." : null} onRetry={() => { setStatus("loading"); setRetry((n) => n + 1); }} /></PhoneShell>;
   }
 
   return (

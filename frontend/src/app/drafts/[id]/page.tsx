@@ -61,7 +61,6 @@ function DraftReview({ draftId }: { draftId: string }) {
         setBody(d.body);
         setLinkedinMessage(d.linkedin_message);
         try {
-          // The draft's own event, not the one currently selected: they differ after switching events.
           const p = await api.getPerson(d.person_id, d.conference_id);
           if (!cancelled) setPerson(p);
         } catch {
@@ -317,8 +316,8 @@ function DraftReview({ draftId }: { draftId: string }) {
         <div className="h-4" />
       </div>
 
-      {/* Bottom action bar: sticky above the floating bottom nav so Approve is always reachable. */}
-      <div className="sticky bottom-[92px] z-20 mt-auto border-t border-line bg-card px-5 pb-4 pt-3">
+      {/* Bottom action bar */}
+      <div className="app-actions mt-auto border-t border-line bg-card px-5 pb-4 pt-3">
         <div className="flex gap-2.5">
           {editing ? (
             <>

@@ -20,6 +20,7 @@ function Ready({ draftId }: { draftId: string }) {
   const [person, setPerson] = useState<PersonCard | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "missing">("loading");
   const [autocopy, setAutocopy] = useState(false);
+  const [copySucceeded, setCopySucceeded] = useState(false);
 
   const [copied, setCopied] = useState<"email" | "linkedin" | "subject" | null>(null);
 
@@ -28,6 +29,7 @@ function Ready({ draftId }: { draftId: string }) {
     api.getDraft(draftId).then(
       async (d) => {
         if (cancelled) return;
+        if (d.status !== "approved") { router.replace(`/drafts/${encodeURIComponent(d.id)}`); return; }
         setDraft(d);
         try {
           const p = await api.getPerson(d.person_id, d.conference_id);
@@ -49,7 +51,7 @@ function Ready({ draftId }: { draftId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [draftId]);
+  }, [draftId, router]);
 
   // Autocopy the email body on arrival once per draft.
   useEffect(() => {
@@ -60,6 +62,7 @@ function Ready({ draftId }: { draftId: string }) {
     navigator.clipboard.writeText(payload).then(
       () => {
         setAutocopy(true);
+        setCopySucceeded(true);
         showToast("Copied");
       },
       () => {
@@ -79,6 +82,7 @@ function Ready({ draftId }: { draftId: string }) {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(kind);
+      setCopySucceeded(true);
       showToast("Copied");
       window.setTimeout(() => {
         setCopied((prev) => (prev === kind ? null : prev));
@@ -143,8 +147,7 @@ function Ready({ draftId }: { draftId: string }) {
             Ready to send to {name}.
           </h1>
           <p className="text-[15px] leading-[1.45] text-muted">
-            Copied to your clipboard. Kairos never sends for you; paste it into
-            your email or LinkedIn.
+            {copySucceeded ? "Copied to your clipboard. Paste it into your email or LinkedIn." : "Copy your approved message below, then paste it into your email or LinkedIn."}
           </p>
         </div>
 

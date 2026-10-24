@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 
 type Size = "sm" | "md" | "lg" | "xl" | "ring";
@@ -34,22 +35,18 @@ function cn(...parts: Array<string | false | undefined>): string {
 }
 
 export function Avatar({ name, src, size = "md", className }: AvatarProps) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const dims = sizeMap[size];
   const label = initials(name);
-  // Remember which URL failed, so a new photo for the same slot gets its own chance to load.
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-  // A plain img: event photos come from any CDN (Luma, conference sites), which next/image would
-  // reject unless every host were configured. A broken photo falls back to initials.
-  if (src && failedSrc !== src) {
+  if (src && src !== failedSrc) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src={src}
         alt={name}
         width={dims.px}
         height={dims.px}
-        loading="lazy"
+        unoptimized
         referrerPolicy="no-referrer"
         onError={() => setFailedSrc(src)}
         className={cn(
