@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Instrument_Sans, Instrument_Serif } from "next/font/google";
+import { Providers } from "./providers";
 import "./globals.css";
 
 const instrumentSans = Instrument_Sans({
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${instrumentSans.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-paper text-ink font-sans">{children}</body>
+      <body className="min-h-full bg-paper text-ink font-sans">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
