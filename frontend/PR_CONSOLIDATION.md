@@ -1,6 +1,6 @@
 # Mobile PR consolidation
 
-PR #10 is the active backend-compatible implementation against `main`. The earlier PRs below are archived design prototypes, not merged features. Their source branches remain intact. Closing them does not mean their complete Figma layouts have been implemented in #10.
+PR #10 merged the initial backend-compatible implementation into `main`. Additional supported Figma screens are supplied in the subsequent screen follow-up PR. The earlier PRs below are archived design prototypes, not merged features. Their source branches remain intact. Closing them does not mean their complete Figma layouts were implemented by the original #10 merge.
 
 | Archived PR | Preserved branch | Source commit | Work to reuse / required fixes |
 | --- | --- | --- | --- |
@@ -11,7 +11,7 @@ PR #10 is the active backend-compatible implementation against `main`. The earli
 | [#8 Trust](https://github.com/kirandevihosur74/kairos/pull/8) | `frontend/flows-v2-pr7-trust` | `dcbb09be628cb9e2965a4b04ee581012cc9ab75e` | Preserve explanation/hide/privacy layouts. Browser reset does not delete server data; source switches do not control ingestion. Server support is required. |
 | [#9 Graph](https://github.com/kirandevihosur74/kairos/pull/9) | `frontend/flows-v2-pr3-graph` | `dd35566f14094fb6949f87d19b508db7e6724903` | Reuse graph, interest bottom-sheet and re-ranked layouts. Reconcile overlapping graph routes and shared component changes with #10. |
 
-## Follow-up now implemented in #10
+## Supported screens implemented in the screen follow-up
 
 - Glance brief with full portrait, real opening/facts, next-person navigation, and note capture.
 - Note-capture bottom sheet with actual recording/transcription, reviewed text, optional tags in the note body, and server-confirmed saving.
