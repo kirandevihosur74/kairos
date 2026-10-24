@@ -1,0 +1,27 @@
+services:
+  graph:
+    image: falkordb/falkordb:v6.0.3
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - graph-data:/data
+    command: ["--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  api:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      KAIROS_STORAGE: falkordb
+      KAIROS_FALKORDB_URL: redis://graph:6379
+      KAIROS_FRONTEND_ORIGIN: ${KAIROS_FRONTEND_ORIGIN:-http://localhost:3000}
+      KAIROS_API_KEY: ${KAIROS_API_KEY:-}
+    depends_on:
+      graph:
+        condition: service_healthy
+volumes:
+  graph-data:

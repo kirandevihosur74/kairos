@@ -1,0 +1,28 @@
+name: Backend
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      graph:
+        image: falkordb/falkordb:v6.0.3
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install uv==0.10.12
+      - run: uv sync --frozen
+      - run: uv run ruff check backend
+      - run: uv run pytest -q
+        env:
+          TEST_FALKORDB_URL: redis://localhost:6379
