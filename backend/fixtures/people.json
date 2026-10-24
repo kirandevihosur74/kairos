@@ -1,0 +1,362 @@
+[
+  {
+    "id": "fixture_p_1",
+    "conference_id": "fixture_conference",
+    "data_mode": "fixture",
+    "name": "Alex Morgan",
+    "title": "Platform Engineering Lead",
+    "company": "Example Build Co",
+    "photo_url": null,
+    "source": "fixture",
+    "match_confidence": "low",
+    "stale": false,
+    "score": 1.0,
+    "why": {
+      "sentence": "Fictional example: ci, developer-productivity overlap with your selected topics.",
+      "nodes": [
+        {
+          "id": "fixture_user",
+          "label": "Demo rep",
+          "type": "User"
+        },
+        {
+          "id": "fixture_goal",
+          "label": "Find CI/CD buyers",
+          "type": "Goal"
+        },
+        {
+          "id": "fixture_p_1",
+          "label": "Alex Morgan",
+          "type": "Person"
+        },
+        {
+          "id": "topic_ci",
+          "label": "ci",
+          "type": "Topic"
+        },
+        {
+          "id": "topic_developer-productivity",
+          "label": "developer-productivity",
+          "type": "Topic"
+        }
+      ],
+      "edges": [
+        {
+          "from": "fixture_user",
+          "to": "fixture_goal",
+          "label": "HAS_GOAL"
+        },
+        {
+          "from": "fixture_goal",
+          "to": "topic_ci",
+          "label": "TARGETS"
+        },
+        {
+          "from": "fixture_p_1",
+          "to": "topic_ci",
+          "label": "INTERESTED_IN"
+        },
+        {
+          "from": "fixture_goal",
+          "to": "topic_developer-productivity",
+          "label": "TARGETS"
+        },
+        {
+          "from": "fixture_p_1",
+          "to": "topic_developer-productivity",
+          "label": "INTERESTED_IN"
+        }
+      ]
+    },
+    "who": "Platform Engineering Lead at Example Build Co (fictional)",
+    "next_step": "Ask about their current build workflow.",
+    "fun_fact": null,
+    "reachability": null,
+    "notes": [],
+    "warm_intro": null,
+    "talks": [],
+    "openers": [],
+    "signals": [],
+    "sources": [
+      {
+        "url": "https://example.invalid/kairos/fixture_p_1",
+        "collected_at": null
+      }
+    ],
+    "triage": null,
+    "met": null
+  },
+  {
+    "id": "fixture_p_2",
+    "conference_id": "fixture_conference",
+    "data_mode": "fixture",
+    "name": "Sam Rivera",
+    "title": "Developer Experience Engineer",
+    "company": "Example Cloud Co",
+    "photo_url": null,
+    "source": "fixture",
+    "match_confidence": "low",
+    "stale": false,
+    "score": 0.5,
+    "why": {
+      "sentence": "Fictional example: developer-productivity overlap with your selected topics.",
+      "nodes": [
+        {
+          "id": "fixture_user",
+          "label": "Demo rep",
+          "type": "User"
+        },
+        {
+          "id": "fixture_goal",
+          "label": "Find CI/CD buyers",
+          "type": "Goal"
+        },
+        {
+          "id": "fixture_p_2",
+          "label": "Sam Rivera",
+          "type": "Person"
+        },
+        {
+          "id": "topic_developer-productivity",
+          "label": "developer-productivity",
+          "type": "Topic"
+        }
+      ],
+      "edges": [
+        {
+          "from": "fixture_user",
+          "to": "fixture_goal",
+          "label": "HAS_GOAL"
+        },
+        {
+          "from": "fixture_goal",
+          "to": "topic_developer-productivity",
+          "label": "TARGETS"
+        },
+        {
+          "from": "fixture_p_2",
+          "to": "topic_developer-productivity",
+          "label": "INTERESTED_IN"
+        }
+      ]
+    },
+    "who": "Developer Experience Engineer at Example Cloud Co (fictional)",
+    "next_step": "Ask about their current build workflow.",
+    "fun_fact": null,
+    "reachability": null,
+    "notes": [],
+    "warm_intro": null,
+    "talks": [],
+    "openers": [],
+    "signals": [],
+    "sources": [
+      {
+        "url": "https://example.invalid/kairos/fixture_p_2",
+        "collected_at": null
+      }
+    ],
+    "triage": null,
+    "met": null
+  },
+  {
+    "id": "fixture_p_3",
+    "conference_id": "fixture_conference",
+    "data_mode": "fixture",
+    "name": "Jordan Lee",
+    "title": "Engineering Manager",
+    "company": "Example Test Co",
+    "photo_url": null,
+    "source": "fixture",
+    "match_confidence": "low",
+    "stale": false,
+    "score": 0.5,
+    "why": {
+      "sentence": "Fictional example: ci overlap with your selected topics.",
+      "nodes": [
+        {
+          "id": "fixture_user",
+          "label": "Demo rep",
+          "type": "User"
+        },
+        {
+          "id": "fixture_goal",
+          "label": "Find CI/CD buyers",
+          "type": "Goal"
+        },
+        {
+          "id": "fixture_p_3",
+          "label": "Jordan Lee",
+          "type": "Person"
+        },
+        {
+          "id": "topic_ci",
+          "label": "ci",
+          "type": "Topic"
+        }
+      ],
+      "edges": [
+        {
+          "from": "fixture_user",
+          "to": "fixture_goal",
+          "label": "HAS_GOAL"
+        },
+        {
+          "from": "fixture_goal",
+          "to": "topic_ci",
+          "label": "TARGETS"
+        },
+        {
+          "from": "fixture_p_3",
+          "to": "topic_ci",
+          "label": "INTERESTED_IN"
+        }
+      ]
+    },
+    "who": "Engineering Manager at Example Test Co (fictional)",
+    "next_step": "Ask about their current build workflow.",
+    "fun_fact": null,
+    "reachability": null,
+    "notes": [],
+    "warm_intro": null,
+    "talks": [],
+    "openers": [],
+    "signals": [],
+    "sources": [
+      {
+        "url": "https://example.invalid/kairos/fixture_p_3",
+        "collected_at": null
+      }
+    ],
+    "triage": null,
+    "met": null
+  },
+  {
+    "id": "fixture_p_4",
+    "conference_id": "fixture_conference",
+    "data_mode": "fixture",
+    "name": "Taylor Chen",
+    "title": "Infrastructure Engineer",
+    "company": "Example Infra Co",
+    "photo_url": null,
+    "source": "fixture",
+    "match_confidence": "low",
+    "stale": false,
+    "score": 0.5,
+    "why": {
+      "sentence": "Fictional example: ci overlap with your selected topics.",
+      "nodes": [
+        {
+          "id": "fixture_user",
+          "label": "Demo rep",
+          "type": "User"
+        },
+        {
+          "id": "fixture_goal",
+          "label": "Find CI/CD buyers",
+          "type": "Goal"
+        },
+        {
+          "id": "fixture_p_4",
+          "label": "Taylor Chen",
+          "type": "Person"
+        },
+        {
+          "id": "topic_ci",
+          "label": "ci",
+          "type": "Topic"
+        }
+      ],
+      "edges": [
+        {
+          "from": "fixture_user",
+          "to": "fixture_goal",
+          "label": "HAS_GOAL"
+        },
+        {
+          "from": "fixture_goal",
+          "to": "topic_ci",
+          "label": "TARGETS"
+        },
+        {
+          "from": "fixture_p_4",
+          "to": "topic_ci",
+          "label": "INTERESTED_IN"
+        }
+      ]
+    },
+    "who": "Infrastructure Engineer at Example Infra Co (fictional)",
+    "next_step": "Ask about their current build workflow.",
+    "fun_fact": null,
+    "reachability": null,
+    "notes": [],
+    "warm_intro": null,
+    "talks": [],
+    "openers": [],
+    "signals": [],
+    "sources": [
+      {
+        "url": "https://example.invalid/kairos/fixture_p_4",
+        "collected_at": null
+      }
+    ],
+    "triage": null,
+    "met": null
+  },
+  {
+    "id": "fixture_p_5",
+    "conference_id": "fixture_conference",
+    "data_mode": "fixture",
+    "name": "Casey Patel",
+    "title": "Community Lead",
+    "company": "Example Community Co",
+    "photo_url": null,
+    "source": "fixture",
+    "match_confidence": "low",
+    "stale": false,
+    "score": 0.0,
+    "why": {
+      "sentence": "Fictional example: No matching topics.",
+      "nodes": [
+        {
+          "id": "fixture_user",
+          "label": "Demo rep",
+          "type": "User"
+        },
+        {
+          "id": "fixture_goal",
+          "label": "Find CI/CD buyers",
+          "type": "Goal"
+        },
+        {
+          "id": "fixture_p_5",
+          "label": "Casey Patel",
+          "type": "Person"
+        }
+      ],
+      "edges": [
+        {
+          "from": "fixture_user",
+          "to": "fixture_goal",
+          "label": "HAS_GOAL"
+        }
+      ]
+    },
+    "who": "Community Lead at Example Community Co (fictional)",
+    "next_step": "Review relevance before shortlisting.",
+    "fun_fact": null,
+    "reachability": null,
+    "notes": [],
+    "warm_intro": null,
+    "talks": [],
+    "openers": [],
+    "signals": [],
+    "sources": [
+      {
+        "url": "https://example.invalid/kairos/fixture_p_5",
+        "collected_at": null
+      }
+    ],
+    "triage": null,
+    "met": null
+  }
+]
