@@ -24,6 +24,8 @@ Implemented base URL: `http://127.0.0.1:8000/api/v1`. Interactive documentation:
 | POST /onboarding/resume | Multipart file | Same preview; text-based PDF only |
 | POST /conference | url, name?, data_mode: fixture or live | 201: conference_id, stage, people_found, data_mode, stale, freshness, source, status_url (live also: collected_at, start_at, end_at, city) |
 | GET /conference/{id}/status | — | Persisted conference status |
+| GET /drafts | conference_id?, status? (draft, approved) | Drafts newest first, each with `person` {id, name, title, company, photo_url}; 404 for an unknown conference |
+| POST /voice/transcribe | Multipart `file` (webm, mp4/m4a, mp3, wav; at most 10 MB), conference_id?, person_id? | text, model, person_candidates, saved: false. Saves nothing |
 | GET /conferences | — | All of the user's events, newest first: conference_id, name, url, stage, created_at, start_at, end_at, data_mode, stale, people_found, counts {interesting, met, drafts_pending} |
 | GET /people | conference_id, triage? | Ranked card array |
 | GET /people/{id} | conference_id | Card including notes, even if skipped |
@@ -86,3 +88,7 @@ Local demo only: CORS is configured for one exact frontend origin; it is not aut
 ### Event list
 
 `counts.interesting` = people triaged interesting; `counts.met` = distinct people with at least one meeting note; `counts.drafts_pending` = drafts not yet approved. `start_at`/`end_at` come from the event page for live Luma events and are null for fixture events, so a client can bucket now/upcoming/past only when dates exist.
+
+### Voice notes
+
+Record in the browser with `MediaRecorder` (Chrome/Android produce webm, iOS Safari mp4) and POST the blob to `/voice/transcribe`. Speech-to-text uses OpenAI `gpt-transcribe` (configurable via `KAIROS_OPENAI_TRANSCRIBE_MODEL`); audio is forwarded once and never stored. The response is text to review: put it in the note box, let the user edit, then save with POST `/met`. With `conference_id` and no `person_id` (mic tapped from any screen), `person_candidates` lists people named in the note by full name or by a first name only one person at the event has, so the app can ask "Is this about Kaushal?". 503 without `KAIROS_OPENAI_API_KEY`, 422 for unsupported/empty audio or no speech, 413 over 10 MB, 502 on provider failure. Microphone access requires a secure context: `localhost` works on the laptop; a phone needs an https URL (for example a tunnel), not `http://<laptop-ip>`.

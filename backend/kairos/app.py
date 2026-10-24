@@ -7,13 +7,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 from redis.exceptions import RedisError
 
+from . import voice
 from .config import Settings
 from .ingest import canonical_url, is_luma, load_event
 from .models import ConferenceInput, DraftEdit, DraftInput, NoteInput, Profile, TextImport, TriageInput
@@ -68,9 +69,10 @@ def create_app(settings: Settings | None = None):
         # Count actual streamed bytes: Content-Length can be missing or inaccurate.
         if request.method in {"POST", "PUT", "PATCH"}:
             data = bytearray()
+            limit = voice.MAX_AUDIO if request.url.path.endswith("/voice/transcribe") else MAX_UPLOAD
             async for chunk in request.stream():
                 data.extend(chunk)
-                if len(data) > MAX_UPLOAD + 64 * 1024:
+                if len(data) > limit + 64 * 1024:
                     return JSONResponse(status_code=413, content={"detail": "Request exceeds upload limit"})
             request._body = bytes(data)
         return await call_next(request)
@@ -105,6 +107,7 @@ def create_app(settings: Settings | None = None):
             if settings.brightdata_api_key and settings.brightdata_zone
             else [],
             "draft_generation": "openai" if settings.openai_api_key else "template",
+            "voice_transcription": settings.openai_transcribe_model if settings.openai_api_key else None,
         }
 
     @app.get(api + "/profile", dependencies=protected)
@@ -284,6 +287,51 @@ def create_app(settings: Settings | None = None):
                 "created_at": now(),
             },
         )
+
+    @app.post(api + "/voice/transcribe", dependencies=protected)
+    def transcribe_voice(
+        file: Annotated[UploadFile, File()],
+        conference_id: Annotated[str | None, Form()] = None,
+        person_id: Annotated[str | None, Form()] = None,
+    ):
+        """Speech-to-text for a voice note. Returns text to review; saves nothing (submit it via POST /met)."""
+        if not settings.openai_api_key:
+            raise HTTPException(503, "Voice notes need KAIROS_OPENAI_API_KEY")
+        s = store()
+        if person_id:
+            if not conference_id:
+                raise HTTPException(422, "person_id requires conference_id")
+            person(s, person_id, conference_id)
+        elif conference_id:
+            require(s, "conference", conference_id)
+        ext = voice.extension(file.filename, file.content_type)
+        if ext not in voice.AUDIO_TYPES:
+            raise HTTPException(422, "Record audio as webm, mp4/m4a, mp3 or wav")
+        audio = file.file.read(voice.MAX_AUDIO + 1)
+        if len(audio) > voice.MAX_AUDIO:
+            raise HTTPException(413, "Voice note must be at most 10 MB")
+        if not audio:
+            raise HTTPException(422, "Empty recording")
+        try:
+            text = voice.transcribe(audio, ext, settings)
+        except voice.TranscriptionError as exc:
+            raise HTTPException(502, f"Transcription failed ({exc}); try again or type the note") from None
+        if not text:
+            raise HTTPException(422, "No speech detected; try again or type the note")
+        candidates = []
+        if conference_id and not person_id:
+            people = [p for p in s.all("person") if p["conference_id"] == conference_id]
+            fields = ("id", "name", "title", "company", "photo_url")
+            candidates = [{f: p.get(f) for f in fields} for p in voice.mentioned(text, people)]
+        return {
+            "text": text,
+            "model": settings.openai_transcribe_model,
+            "conference_id": conference_id,
+            "person_id": person_id,
+            # People named in the note, so a mic tap from any screen can ask "Is this about Xinyu?"
+            "person_candidates": candidates,
+            "saved": False,
+        }
 
     @app.get(api + "/priorities", dependencies=protected)
     def priorities(conference_id: str):

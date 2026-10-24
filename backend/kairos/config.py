@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-6-astra"
     openai_timeout: float = 30
+    # Speech-to-text model for voice notes (whisper-1 still works but is deprecated by OpenAI).
+    openai_transcribe_model: str = "gpt-transcribe"
 
     @field_validator("openai_model")
     @classmethod
