@@ -11,3 +11,4 @@ dist/
 backend/data/
 uploads/
 *.log
+.spawnpoint-bundle/
