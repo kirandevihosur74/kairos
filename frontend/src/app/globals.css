@@ -17,10 +17,17 @@
   --color-spectrum-3: #ef8474;
   --color-spectrum-4: #ee9bb5;
 
+  --color-code-bg: #2b2a26;
+  --color-code-fg: #f1efe8;
+
   --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
 
   --radius-card: 12px;
+  --radius-card-lg: 16px;
+  --radius-card-xl: 20px;
 }
 
 @layer base {
@@ -57,4 +64,9 @@
   );
   background-clip: text;
   color: transparent;
+}
+
+@utility bg-code {
+  background-color: var(--color-code-bg);
+  color: var(--color-code-fg);
 }

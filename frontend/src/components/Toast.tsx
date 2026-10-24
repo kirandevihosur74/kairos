@@ -9,13 +9,24 @@ import {
   type ReactNode,
 } from "react";
 
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+interface ToastOptions {
+  action?: ToastAction;
+  durationMs?: number;
+}
+
 interface ToastItem {
   id: number;
   message: string;
+  action?: ToastAction;
 }
 
 interface ToastContextValue {
-  showToast: (message: string) => void;
+  showToast: (message: string, options?: ToastOptions) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -26,14 +37,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const idRef = useRef(0);
 
-  const showToast = useCallback((message: string) => {
-    idRef.current += 1;
-    const id = idRef.current;
-    setToasts((prev) => [...prev, { id, message }]);
-    window.setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, DEFAULT_DURATION_MS);
-  }, []);
+  const showToast = useCallback(
+    (message: string, options?: ToastOptions) => {
+      idRef.current += 1;
+      const id = idRef.current;
+      setToasts((prev) => [
+        ...prev,
+        { id, message, action: options?.action },
+      ]);
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, options?.durationMs ?? DEFAULT_DURATION_MS);
+    },
+    [],
+  );
 
   return (
     <ToastContext.Provider value={{ showToast }}>
@@ -43,9 +60,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role="status"
-            className="pointer-events-auto rounded-full border border-ink bg-ink px-4 py-2 text-sm font-medium text-white"
+            className="pointer-events-auto flex items-center gap-3 rounded-full bg-ink pl-4 pr-2 py-2 text-sm font-medium text-white"
           >
-            {t.message}
+            <span>{t.message}</span>
+            {t.action ? (
+              <button
+                type="button"
+                onClick={() => {
+                  t.action?.onClick();
+                  setToasts((prev) => prev.filter((x) => x.id !== t.id));
+                }}
+                className="rounded-full px-3 py-1 text-sm font-semibold text-[#F2A14B] hover:bg-white/5"
+              >
+                {t.action.label}
+              </button>
+            ) : null}
           </div>
         ))}
       </div>
