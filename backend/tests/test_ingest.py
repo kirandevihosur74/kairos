@@ -131,14 +131,15 @@ def test_failed_fetch_falls_back_to_stale_snapshot(live):
     path = ingest.snapshot_path(settings.snapshot_dir, "https://luma.com/example")
     os.utime(path, (0, 0))  # expire the cache
     fetcher.fail = True
-    conference = add_event(client).json()
-    assert conference["stale"] is True
-    people = client.get("/api/v1/people", params={"conference_id": conference["id"]}).json()
-    assert all(p["stale"] for p in people)
+    # Re-adding the page reopens the event, so exercise the loader the way a refresh would.
+    event, freshness = ingest.load_event("https://luma.com/example", settings, COLLECTED)
+    assert freshness == "stale"
+    assert all(p["stale"] for p in event["people"])
     path.unlink()
-    response = add_event(client)
-    assert response.status_code == 502
-    assert "no snapshot" in response.json()["detail"]
+    with pytest.raises(HTTPException) as failed:
+        ingest.load_event("https://luma.com/example", settings, COLLECTED)
+    assert failed.value.status_code == 502
+    assert "no snapshot" in failed.value.detail
 
 
 def test_judges_separated_by_blank_paragraphs_are_all_kept():
@@ -275,6 +276,10 @@ def web(settings, tmp_path, monkeypatch, fake_model):
         yield client, fetched
 
 
+def web_settings(client):
+    return client.app.state.settings
+
+
 def test_any_public_event_page_becomes_ranked_cards(web):
     client, fetched = web
     body = {"url": "https://www.meetup.com/sf-backend/events/123/", "data_mode": "live"}
@@ -286,7 +291,8 @@ def test_any_public_event_page_becomes_ranked_cards(web):
     assert all(p["site"] == "www.meetup.com" and p["data_mode"] == "live" for p in people)
     assert client.get("/health").json()["live_sources"] == ["luma", "any_public_page"]
     again = client.post("/api/v1/conference", json=body).json()
-    assert again["freshness"] == "cache" and fetched == [body["url"]]
+    assert again["conference_id"] == conference["conference_id"] and fetched == [body["url"]]
+    assert ingest.load_event(body["url"], web_settings(client), COLLECTED)[1] == "cache"
 
 
 def test_non_luma_page_without_openai_is_rejected(settings, tmp_path):
@@ -329,3 +335,17 @@ def test_main_event_page_follows_its_judges_page(web, monkeypatch, fake_model):
     assert fetched == list(pages)
     card = client.get("/api/v1/people", params={"conference_id": conference["id"]}).json()[0]
     assert card["sources"][0]["url"] == "https://summit.example.com/summit/judges"
+
+
+def test_photos_follow_card_layout_and_skip_people_without_one():
+    page = (
+        '<img src="/logo.svg" alt="Site logo">'
+        '<div><img src="https://cdn.example.com/a.jpg" alt=""><h3>Avery Example</h3></div>'
+        "<div><h3>Casey Example</h3></div>"  # no photo: Avery's must not be reused
+        '<div><img src="https://cdn.example.com/d.jpg"><h3>Drew Example</h3></div>'
+        '<div><img src="http://insecure.example.com/e.jpg"><h3>Eli Example</h3></div>'
+    )
+    photos = ingest.photos_for(
+        ["Avery Example", "Casey Example", "Drew Example", "Eli Example"], [("https://x.example.com/judges", page)]
+    )
+    assert photos == {"Avery Example": "https://cdn.example.com/a.jpg", "Drew Example": "https://cdn.example.com/d.jpg"}

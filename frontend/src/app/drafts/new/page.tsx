@@ -105,6 +105,15 @@ function NewDraft() {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      // Reopen the unapproved draft of this kind for this person instead of writing a new one each
+      // time: generating again would silently replace the text the user already reviewed.
+      const pending = (await api.listDrafts(conferenceId, "draft")).find(
+        (d) => d.person_id === personId && d.kind === kind && kind !== "referral",
+      );
+      if (pending) {
+        router.replace(`/drafts/${pending.id}`);
+        return;
+      }
       const draft = await api.draftFollowup(
         personId,
         conferenceId,

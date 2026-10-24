@@ -218,12 +218,12 @@ function TopBar({ onBack }: { onBack: () => void }) {
 function PersonHeader({ person }: { person: PersonCard }) {
   const subtitle = [person.title, person.company].filter(Boolean).join(" · ");
   const sampleData = person.data_mode === "fixture";
-  const matchLabel =
-    person.match_confidence === "high"
-      ? "Matches high"
-      : person.match_confidence === "medium"
-        ? "Matches medium"
-        : "Matches low";
+  // Same measure as the Discover card: shared topics out of the interests in the user's profile.
+  const matched = person.why.nodes.filter((n) => n.type === "Topic").length;
+  const totalInterests = person.score > 0 ? Math.round(matched / person.score) : null;
+  const matchLabel = totalInterests
+    ? `Matches ${matched} of ${totalInterests} interests`
+    : "No shared interests yet";
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-4">
@@ -239,6 +239,8 @@ function PersonHeader({ person }: { person: PersonCard }) {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {person.met ? <Chip tone="on">Met</Chip> : null}
+        {person.triage === "interesting" ? <Chip tone="on">Interesting</Chip> : null}
+        {person.triage === "not_interesting" ? <Chip tone="outline">Skipped</Chip> : null}
         {sampleData ? <Chip tone="outline">Sample data</Chip> : null}
         <Chip tone="outline">{matchLabel}</Chip>
       </div>

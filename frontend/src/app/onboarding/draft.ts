@@ -1,4 +1,4 @@
-import { ApiError, type ImportPreview, type ProfileInput } from "@/lib/api";
+import { ApiError, type ImportPreview, type Profile, type ProfileInput } from "@/lib/api";
 
 export const DRAFT_STORAGE_KEY = "kairos.onboarding.draft";
 
@@ -36,6 +36,21 @@ export function readStoredDraft(): Draft {
   } catch {
     return emptyDraft;
   }
+}
+
+/** The saved profile as an editable draft, so editing starts from what the user actually entered. */
+export function profileToDraft(profile: Profile): Draft {
+  return {
+    ...emptyDraft,
+    name: profile.name,
+    target_roles: profile.target_roles,
+    interests: profile.interests,
+    skills: profile.skills,
+    background: profile.background,
+    location_preferences: profile.location_preferences,
+    linkedin_url: profile.linkedin_url ?? "",
+    import_id: profile.import_id,
+  };
 }
 
 export function writeStoredDraft(draft: Draft) {

@@ -57,7 +57,10 @@ export function PhoneShell({
           className,
         )}
       >
-        <div className="flex h-11 shrink-0 items-center justify-between px-6 pt-2 text-[13px] font-medium text-ink">
+        {/* On a phone the device draws its own status bar; leave room for the notch instead of
+            drawing a fake 9:41 bar under the real one. The mock bar is only for the desktop preview. */}
+        <div aria-hidden className="h-[max(env(safe-area-inset-top),12px)] shrink-0 sm:hidden" />
+        <div className="hidden h-11 shrink-0 items-center justify-between px-6 pt-2 text-[13px] font-medium text-ink sm:flex">
           <span className="tracking-tight">{time}</span>
           <div className="flex items-center gap-1.5">
             <SignalIcon />

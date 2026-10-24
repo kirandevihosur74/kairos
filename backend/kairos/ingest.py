@@ -333,6 +333,35 @@ def people_pages(html, url):
     return found[:MAX_PEOPLE_PAGES]
 
 
+IMG_TAG = re.compile(r"<img\b[^>]*>", re.I)
+IMG_SRC = re.compile(r"""\ssrc=["']([^"']+)["']""", re.I)
+PHOTO_WINDOW = 3000  # characters between a card's photo and the name under it
+
+
+def photos_for(names, pages):
+    """Match each person to the photo in their card: the nearest image before their name, unless another
+    listed person's name sits in between (that photo is theirs). Pages are [(url, html)]. Logos, icons and
+    non-https images are skipped; people with no photo are simply absent from the result."""
+    found = {}
+    for page_url, html in pages:
+        lowered = html.casefold()
+        spots = sorted((i, n) for n in names if (i := lowered.find(n.casefold())) >= 0)
+        images = []
+        for tag in IMG_TAG.finditer(html):
+            src = IMG_SRC.search(tag.group(0))
+            if not src:
+                continue
+            absolute = urljoin(page_url, htmllib.unescape(src.group(1)))
+            if absolute.startswith("https://") and not re.search(r"(?i)(logo|icon|sprite)|\.svg(\?|$)", absolute):
+                images.append((tag.start(), absolute))
+        for index, (at, name) in enumerate(spots):
+            previous_name = spots[index - 1][0] if index else -1
+            near = [src for pos, src in images if previous_name < pos < at and at - pos <= PHOTO_WINDOW]
+            if near and name not in found:
+                found[name] = near[-1]
+    return found
+
+
 def parse_web(html, url, collected_at, settings, extra_pages=()):
     """AI extraction for any public event page plus its people sub-pages ([(url, html)]).
 
@@ -412,7 +441,10 @@ def parse_web(html, url, collected_at, settings, extra_pages=()):
                 ],
             }
         )
-    log_event("extract.done", url=url, ms=t.ms, returned=len(found), kept=len(people), dropped_unverified=len(found[:60]) - len(people))
+    photos = photos_for([p["name"] for p in people], [(url, html), *extra_pages])
+    for p in people:
+        p["photo_url"] = photos.get(p["name"])
+    log_event("extract.done", url=url, photos=len(photos), ms=t.ms, returned=len(found), kept=len(people), dropped_unverified=len(found[:60]) - len(people))
     name = str(event.get("name") or "").strip() or title or host
     return {
         "name": name[:200],

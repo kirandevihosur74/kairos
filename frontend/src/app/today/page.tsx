@@ -31,6 +31,23 @@ function TodayView() {
     | { kind: "ready"; people: PersonCard[] }
     | { kind: "error" }
   >({ kind: "loading" });
+  const [eventName, setEventName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!conferenceId) return;
+    let cancelled = false;
+    api.getConferenceStatus(conferenceId).then(
+      (c) => {
+        if (!cancelled) setEventName(c.name);
+      },
+      () => {
+        // The name is a label only; priorities still load without it.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [conferenceId]);
 
   useEffect(() => {
     if (!conferenceId) {
@@ -77,7 +94,12 @@ function TodayView() {
     <PhoneShell>
       <div className="flex flex-1 flex-col gap-5 px-4 pb-10 pt-4">
         <header className="flex flex-col gap-2 px-2">
-          <SectionLabel>Today</SectionLabel>
+          <div className="flex items-center justify-between gap-3">
+            <SectionLabel>{eventName ? `Today · ${eventName}` : "Today"}</SectionLabel>
+            <Link href="/onboarding" className="shrink-0 text-[13px] font-medium text-muted">
+              Edit profile
+            </Link>
+          </div>
           <h1 className="font-serif text-[34px] leading-[1.05] tracking-[-0.01em] text-ink">
             Who to find first.
           </h1>
@@ -86,6 +108,10 @@ function TodayView() {
             person.
           </p>
         </header>
+
+        <Button variant="secondary" size="md" fullWidth onClick={() => router.push("/events")}>
+          Other events
+        </Button>
 
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between px-2">

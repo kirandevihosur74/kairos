@@ -21,7 +21,7 @@ from . import logs, voice
 from .config import Settings
 from .ingest import canonical_url, is_luma, load_event
 from .models import ConferenceInput, DraftEdit, DraftInput, NoteInput, Profile, TextImport, TriageInput
-from .service import cards, make_draft, memory, now, person, profile, require, suggest, uid
+from .service import cards, event_key, make_draft, memory, now, person, profile, require, suggest, uid
 from .store import FalkorStore, SQLiteStore
 
 log = logging.getLogger(__name__)
@@ -61,6 +61,7 @@ def create_app(settings: Settings | None = None):
         lifespan=lifespan,
         description="Single-user backend MVP. Fixture people and template drafts are explicitly labeled.",
     )
+    app.state.settings = settings
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
@@ -196,6 +197,18 @@ def create_app(settings: Settings | None = None):
         profile(store())
         live = body.data_mode == "live"
         url = canonical_url(str(body.url)) if live else str(body.url)
+        # The same event page added again reopens it, keeping its shortlist, notes and drafts.
+        existing = next(
+            (
+                c
+                for c in sorted(store().all("conference"), key=lambda c: c["created_at"])
+                if c["stage"] == "ready" and c["data_mode"] == body.data_mode and event_key(c["url"]) == event_key(url)
+            ),
+            None,
+        )
+        if existing:
+            logs.event("conference.reopened", id=existing["id"], url=url)
+            return {**existing, "status_url": api + f"/conference/{existing['id']}/status"}
         cid = uid("conference")
         conference = {
             "id": cid,

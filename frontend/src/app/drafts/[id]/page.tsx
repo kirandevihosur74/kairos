@@ -18,7 +18,6 @@ import {
   type DraftKind,
   type PersonCard,
 } from "@/lib/api";
-import { useSession } from "@/lib/session";
 
 type Channel = "email" | "linkedin";
 
@@ -36,7 +35,6 @@ const kindTone: Record<DraftKind, "outline" | "cream" | "amber"> = {
 
 function DraftReview({ draftId }: { draftId: string }) {
   const router = useRouter();
-  const { conferenceId } = useSession();
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [person, setPerson] = useState<PersonCard | null>(null);
@@ -63,8 +61,8 @@ function DraftReview({ draftId }: { draftId: string }) {
         setBody(d.body);
         setLinkedinMessage(d.linkedin_message);
         try {
-          const cid = conferenceId ?? d.conference_id;
-          const p = await api.getPerson(d.person_id, cid);
+          // The draft's own event, not the one currently selected: they differ after switching events.
+          const p = await api.getPerson(d.person_id, d.conference_id);
           if (!cancelled) setPerson(p);
         } catch {
           // Non-blocking.
@@ -83,7 +81,7 @@ function DraftReview({ draftId }: { draftId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [draftId, conferenceId]);
+  }, [draftId]);
 
   const dirty = useMemo(() => {
     if (!draft) return false;

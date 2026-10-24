@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type ChangeEvent } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { Button, PhoneShell, SectionLabel } from "@/components";
 import { api } from "@/lib/api";
 import { ChipField } from "./ChipField";
@@ -9,6 +9,7 @@ import {
   applyPreview,
   describeError,
   emptyDraft,
+  profileToDraft,
   readStoredDraft,
   writeStoredDraft,
   type Draft,
@@ -29,6 +30,25 @@ export default function OnboardingImportPage() {
     setDraft(next);
     writeStoredDraft(next);
   };
+
+  // Editing an existing profile: start from the saved one, not a blank form.
+  useEffect(() => {
+    if (draft.name || draft.interests.length) return;
+    let cancelled = false;
+    api.getProfile().then(
+      (profile) => {
+        if (!cancelled) persist(profileToDraft(profile));
+      },
+      () => {
+        // No profile yet (409): first-time onboarding starts blank.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+    // Runs once on open; later edits must not be overwritten by the saved profile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const runImportText = async () => {
     if (!pasteText.trim()) return;

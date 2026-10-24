@@ -11,12 +11,10 @@ import {
   useToast,
 } from "@/components";
 import { ApiError, api, type Draft, type PersonCard } from "@/lib/api";
-import { useSession } from "@/lib/session";
 
 function Ready({ draftId }: { draftId: string }) {
   const router = useRouter();
   const { showToast } = useToast();
-  const { conferenceId } = useSession();
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [person, setPerson] = useState<PersonCard | null>(null);
@@ -32,8 +30,7 @@ function Ready({ draftId }: { draftId: string }) {
         if (cancelled) return;
         setDraft(d);
         try {
-          const cid = conferenceId ?? d.conference_id;
-          const p = await api.getPerson(d.person_id, cid);
+          const p = await api.getPerson(d.person_id, d.conference_id);
           if (!cancelled) setPerson(p);
         } catch {
           // non-blocking
@@ -52,7 +49,7 @@ function Ready({ draftId }: { draftId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [draftId, conferenceId]);
+  }, [draftId]);
 
   // Autocopy the email body on arrival once per draft.
   useEffect(() => {

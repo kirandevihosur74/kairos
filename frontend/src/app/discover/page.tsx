@@ -66,10 +66,14 @@ function DiscoverDeck() {
   useEffect(() => {
     if (!conferenceId) return;
     let cancelled = false;
-    api.listPeople(conferenceId).then(
+    // "all" includes people already skipped, so the shortlist counts are complete.
+    api.listPeople(conferenceId, "all").then(
       (list) => {
         if (cancelled) return;
         setPeople(list);
+        // Resume at the first person not decided on yet instead of re-showing marked cards.
+        const next = list.findIndex((p) => p.triage === null);
+        setIndex(next === -1 ? list.length : next);
       },
       (err) => {
         if (cancelled) return;
@@ -110,9 +114,10 @@ function DiscoverDeck() {
       const personId = current.id;
       try {
         const updated = await api.triage(conferenceId, personId, decision);
+        // The API answers with `decision`; cards carry it as `triage`.
         setPeople((prev) =>
           prev
-            ? prev.map((p) => (p.id === personId ? { ...p, ...updated } : p))
+            ? prev.map((p) => (p.id === personId ? { ...p, triage: updated.decision } : p))
             : prev,
         );
         showToast(
@@ -250,6 +255,13 @@ function PersonDeckCard({
           <div className="absolute left-3 top-3">
             <Chip tone="outline">{provenance.chip}</Chip>
           </div>
+          {card.triage ? (
+            <div className="absolute right-3 top-3">
+              <Chip tone={card.triage === "interesting" ? "on" : "outline"}>
+                {card.triage === "interesting" ? "Marked interesting" : "Skipped"}
+              </Chip>
+            </div>
+          ) : null}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <Avatar name={card.name} src={card.photo_url} size="ring" />
           </div>
