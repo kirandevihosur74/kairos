@@ -1,6 +1,15 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
-type Tone = "neutral" | "outline" | "on" | "suggest" | "cream" | "alert" | "amber";
+type Tone =
+  | "neutral"
+  | "outline"
+  | "on"
+  | "suggest"
+  | "cream"
+  | "alert"
+  | "amber"
+  | "gradient"
+  | "selected";
 
 export interface ChipProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: Tone;
@@ -11,12 +20,13 @@ export interface ChipProps extends HTMLAttributes<HTMLSpanElement> {
 const toneClasses: Record<Tone, string> = {
   neutral: "bg-subtle text-ink",
   outline: "bg-card text-ink border border-line",
-  on: "bg-cream text-ink border border-ink",
-  suggest:
-    "bg-transparent text-muted border border-dashed border-line",
+  on: "bg-cream text-ink",
+  suggest: "bg-transparent text-muted border border-dashed border-line",
   cream: "bg-cream text-ink",
   alert: "bg-alert/10 text-alert",
   amber: "bg-amber/10 text-amber",
+  gradient: "bg-spectrum text-ink border border-ink",
+  selected: "bg-subtle text-alert border border-ink",
 };
 
 function cn(...parts: Array<string | false | undefined>): string {
