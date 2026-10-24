@@ -26,7 +26,8 @@ def settings(request, tmp_path):
         from falkordb import FalkorDB
 
         db = FalkorDB.from_url(value.falkordb_url)
-        db.select_graph(value.graph_name).delete()
+        if value.graph_name in db.list_graphs():  # tests that never start the app create no graph
+            db.select_graph(value.graph_name).delete()
         db.connection.close()
 
 
