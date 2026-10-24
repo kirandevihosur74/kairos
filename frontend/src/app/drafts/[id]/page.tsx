@@ -411,6 +411,10 @@ function labelForType(t: string): string {
       return "Them";
     case "note":
       return "Note";
+    case "memory":
+      return "Memory";
+    case "user_supplied_job":
+      return "Job";
     default:
       return t;
   }

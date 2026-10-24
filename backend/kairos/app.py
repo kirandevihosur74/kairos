@@ -18,7 +18,7 @@ from . import voice
 from .config import Settings
 from .ingest import canonical_url, is_luma, load_event
 from .models import ConferenceInput, DraftEdit, DraftInput, NoteInput, Profile, TextImport, TriageInput
-from .service import cards, make_draft, now, person, profile, require, suggest, uid
+from .service import cards, make_draft, memory, now, person, profile, require, suggest, uid
 from .store import FalkorStore, SQLiteStore
 
 log = logging.getLogger(__name__)
@@ -266,6 +266,11 @@ def create_app(settings: Settings | None = None):
     @app.get(api + "/people/{pid}/graph", dependencies=protected)
     def get_graph(pid: str, conference_id: str):
         return get_person(pid, conference_id)["why"]
+
+    @app.get(api + "/people/{pid}/memory", dependencies=protected)
+    def get_memory(pid: str, conference_id: str):
+        """Graph memory: earlier meetings with this person at other events, and colleague conversations."""
+        return memory(store(), person(store(), pid, conference_id))
 
     @app.post(api + "/triage", dependencies=protected)
     def triage(body: TriageInput):

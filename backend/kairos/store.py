@@ -16,6 +16,11 @@ KINDS = {
 }
 
 
+def name_key(value):
+    """Normalized key for matching a company or a person's name across events."""
+    return " ".join((value or "").casefold().split())
+
+
 class SQLiteStore:
     engine = "sqlite"
 
@@ -53,6 +58,20 @@ class SQLiteStore:
         wanted = set(profile["interests"])
         return {p["id"]: sorted(wanted.intersection(p["topics"])) for p in people}
 
+    def related(self, person):
+        """(relation, other person) pairs: same company, or the same name at another event."""
+        company, name = name_key(person.get("company")), name_key(person["name"])
+        found = []
+        for other in self.all("person"):
+            if other["id"] == person["id"]:
+                continue
+            if name_key(other["name"]) == name:
+                if other["conference_id"] != person["conference_id"]:
+                    found.append(("same_person", other))
+            elif company and name_key(other.get("company")) == company:
+                found.append(("same_company", other))
+        return found
+
     def ping(self):
         with closing(self.connect()) as db:
             db.execute("SELECT 1")
@@ -66,10 +85,19 @@ class FalkorStore:
 
     def __init__(self, url, name):
         from falkordb import FalkorDB
+        from redis.exceptions import ConnectionError as RedisConnectionError
 
-        self.db = FalkorDB.from_url(url, socket_timeout=5, socket_connect_timeout=5)
-        self.graph = self.db.select_graph(name)
-        self.ping()
+        for attempt in range(3):
+            self.db = FalkorDB.from_url(url, socket_timeout=5, socket_connect_timeout=5)
+            self.graph = self.db.select_graph(name)
+            try:
+                self.ping()
+                return
+            except (AttributeError, RedisConnectionError, OSError):
+                # A freshly opened connection is occasionally dropped before its first reply; reconnect.
+                self.db.connection.close()
+                if attempt == 2:
+                    raise
 
     def put(self, kind, value):
         label = KINDS[kind]  # fixed allowlist; all user values are query parameters
@@ -84,12 +112,20 @@ class FalkorStore:
             FOREACH (topic IN $topics | MERGE (t:Topic {name:topic}) MERGE (g)-[:TARGETS]->(t))
             """
         elif kind == "person":
-            params.update(topics=value["topics"], cid=value["conference_id"])
+            company = name_key(value.get("company"))
+            params.update(
+                topics=value["topics"],
+                cid=value["conference_id"],
+                name_key=name_key(value["name"]),
+                companies=[{"key": company, "name": value["company"].strip()}] if company else [],
+            )
             query += """
+            SET n.name_key=$name_key
             MERGE (c:Conference {id:$cid}) MERGE (n)-[:APPEARS_AT]->(c)
-            WITH n OPTIONAL MATCH (n)-[old:INTERESTED_IN]->() DELETE old
+            WITH n OPTIONAL MATCH (n)-[old:INTERESTED_IN|WORKS_AT]->() DELETE old
             WITH DISTINCT n
             FOREACH (topic IN $topics | MERGE (t:Topic {name:topic}) MERGE (n)-[:INTERESTED_IN]->(t))
+            FOREACH (co IN $companies | MERGE (k:Company {key:co.key}) SET k.name=co.name MERGE (n)-[:WORKS_AT]->(k))
             """
         elif kind in {"note", "triage", "draft"}:
             params.update(uid="demo_user", pid=value["person_id"], cid=value["conference_id"])
@@ -125,6 +161,30 @@ class FalkorStore:
             {"uid": profile["id"], "cid": people[0]["conference_id"]},
         ).result_set
         return {row[0]: sorted(row[1]) for row in rows}
+
+    def related(self, person):
+        """Graph memory hops: colleagues via (Person)-[:WORKS_AT]->(Company)<-[:WORKS_AT]-(Person),
+        and the same person (by normalized name) appearing at a different event."""
+        params = {"pid": person["id"], "cid": person["conference_id"], "name_key": name_key(person["name"])}
+        same_person = self.graph.ro_query(
+            """
+            MATCH (o:Person {name_key:$name_key})-[:APPEARS_AT]->(c:Conference)
+            WHERE o.id <> $pid AND c.id <> $cid
+            RETURN DISTINCT o.payload
+            """,
+            params,
+        ).result_set
+        colleagues = self.graph.ro_query(
+            """
+            MATCH (:Person {id:$pid})-[:WORKS_AT]->(:Company)<-[:WORKS_AT]-(o:Person)
+            WHERE o.id <> $pid AND o.name_key <> $name_key
+            RETURN DISTINCT o.payload
+            """,
+            params,
+        ).result_set
+        return [("same_person", json.loads(r[0])) for r in same_person] + [
+            ("same_company", json.loads(r[0])) for r in colleagues
+        ]
 
     def ping(self):
         self.graph.query("RETURN 1")

@@ -15,6 +15,7 @@ import {
 } from "@/components";
 import { ApiError, api, type PersonCard } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { MemorySection } from "./_components/MemorySection";
 import { WhyPathDiagram } from "./_components/WhyPath";
 
 type LoadState = "loading" | "ready" | "error";
@@ -174,6 +175,8 @@ function PersonPageInner({ id }: { id: string }) {
             </Card>
           </section>
         ) : null}
+
+        {conferenceId ? <MemorySection personId={person.id} conferenceId={conferenceId} /> : null}
 
         <NotesHistory notes={person.notes} />
 

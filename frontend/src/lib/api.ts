@@ -12,7 +12,7 @@ export type DraftKind = "introduction" | "follow_up" | "referral";
 export type DraftStatus = "draft" | "approved";
 export type ConferenceStage = "pending" | "ready" | "failed";
 export type MatchConfidence = "low" | "medium" | "high";
-export type GroundingType = "profile" | "person" | "note";
+export type GroundingType = "profile" | "person" | "note" | "memory" | "user_supplied_job";
 
 export interface Profile {
   id: string;
@@ -156,6 +156,27 @@ export interface Grounding {
   type: GroundingType;
   text: string;
   sources?: SourceRef[];
+  /** Memory items only: the graph path that links the fact to this person. */
+  path?: string[];
+}
+
+/** One fact from the user's graph memory that bears on a person. */
+export interface MemoryItem {
+  id: string;
+  type: "earlier_meeting" | "earlier_message" | "colleague_conversation";
+  summary: string;
+  text: string;
+  created_at: string | null;
+  person: { id: string; name: string; title: string | null; company: string | null };
+  conference: { id: string | null; name: string | null };
+  /** e.g. ["Alex", "WORKS_AT", "Example Co", "WORKS_AT", "Riley"] */
+  path: string[];
+}
+
+export interface PersonMemory {
+  person_id: string;
+  sentence: string;
+  items: MemoryItem[];
 }
 
 export interface Draft {
@@ -326,6 +347,11 @@ export const api = {
 
   getPerson: (personId: string, conferenceId: string) =>
     request<PersonCard>(`/people/${personId}`, {
+      query: { conference_id: conferenceId },
+    }),
+
+  getMemory: (personId: string, conferenceId: string) =>
+    request<PersonMemory>(`/people/${personId}/memory`, {
       query: { conference_id: conferenceId },
     }),
 

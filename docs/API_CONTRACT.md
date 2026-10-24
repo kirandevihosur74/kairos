@@ -29,6 +29,7 @@ Implemented base URL: `http://127.0.0.1:8000/api/v1`. Interactive documentation:
 | GET /conferences | — | All of the user's events, newest first: conference_id, name, url, stage, created_at, start_at, end_at, data_mode, stale, people_found, counts {interesting, met, drafts_pending} |
 | GET /people | conference_id, triage? | Ranked card array |
 | GET /people/{id} | conference_id | Card including notes, even if skipped |
+| GET /people/{id}/memory | conference_id | Graph memory: sentence, items [{id, type (earlier_meeting, earlier_message, colleague_conversation), summary, text, person, conference, path}] |
 | GET /people/{id}/graph | conference_id | sentence, nodes, edges |
 | POST /triage | conference_id, person_id, decision | Persisted decision |
 | POST /met | conference_id, person_id, note | 201: note_id, text, created_at |
@@ -92,3 +93,7 @@ Local demo only: CORS is configured for one exact frontend origin; it is not aut
 ### Voice notes
 
 Record in the browser with `MediaRecorder` (Chrome/Android produce webm, iOS Safari mp4) and POST the blob to `/voice/transcribe`. Speech-to-text uses OpenAI `gpt-transcribe` (configurable via `KAIROS_OPENAI_TRANSCRIBE_MODEL`); audio is forwarded once and never stored. The response is text to review: put it in the note box, let the user edit, then save with POST `/met`. With `conference_id` and no `person_id` (mic tapped from any screen), `person_candidates` lists people named in the note by full name or by a first name only one person at the event has, so the app can ask "Is this about Kaushal?". 503 without `KAIROS_OPENAI_API_KEY`, 422 for unsupported/empty audio or no speech, 413 over 10 MB, 502 on provider failure. Microphone access requires a secure context: `localhost` works on the laptop; a phone needs an https URL (for example a tunnel), not `http://<laptop-ip>`.
+
+### Graph memory (FalkorDB)
+
+People are linked to companies with `(Person)-[:WORKS_AT]->(Company)` and carry a normalized `name_key`. `GET /people/{id}/memory` walks the graph from that person to (1) the same person at other events (`SAME_PERSON`) and (2) colleagues at the same company at any event (`WORKS_AT → Company ← WORKS_AT`), and returns only the user's own recorded interactions with them: meeting notes and approved messages. Appearing at the same company is not memory by itself. Each item carries the graph `path` that produced it. AI drafts receive these items as `memory` context, may mention the most relevant one, cite it in `grounded_on` (type `memory`, with `path`), and must not claim a colleague endorsed or referred the user. SQLite mode computes the same relations in Python.

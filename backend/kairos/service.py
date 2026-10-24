@@ -42,6 +42,53 @@ def notes_for(store, pid):
     )
 
 
+def memory(store, p):
+    """What the user's graph already knows that bears on this person: their own earlier meetings with
+    the same person at other events, and conversations with colleagues at the same company.
+
+    Only the user's recorded interactions count; merely appearing at the same company is not memory.
+    """
+    conferences = {c["id"]: c for c in store.all("conference")}
+    notes, drafts = {}, {}
+    for n in store.all("note"):
+        notes.setdefault(n["person_id"], []).append(n)
+    for d in store.all("draft"):
+        if d["status"] == "approved":
+            drafts.setdefault(d["person_id"], []).append(d)
+    items = []
+    for relation, other in store.related(p):
+        event = conferences.get(other["conference_id"], {})
+        where = event.get("name") or "another event"
+        about = {k: other.get(k) for k in ("id", "name", "title", "company")}
+        if relation == "same_person":
+            path = [p["name"], "SAME_PERSON", where]
+            for n in notes.get(other["id"], []):
+                items.append(("earlier_meeting", n["id"], n["text"], f"You met {other['name']} at {where}", n["created_at"], about, event, path))
+            for d in drafts.get(other["id"], []):
+                items.append(("earlier_message", d["id"], d["subject"], f"You already sent {other['name']} a message after {where}", d["approved_at"], about, event, path))
+        else:
+            path = [p["name"], "WORKS_AT", other.get("company") or "", "WORKS_AT", other["name"]]
+            for n in notes.get(other["id"], []):
+                label = f"You talked with {other['name']}, who also works at {other['company']}, at {where}"
+                items.append(("colleague_conversation", n["id"], n["text"], label, n["created_at"], about, event, path))
+    items.sort(key=lambda i: i[4] or "", reverse=True)
+    result = [
+        {
+            "id": "memory:" + ref,
+            "type": kind,
+            "summary": summary,
+            "text": text,
+            "created_at": created,
+            "person": about,
+            "conference": {"id": event.get("id"), "name": event.get("name")},
+            "path": path,
+        }
+        for kind, ref, text, summary, created, about, event, path in items
+    ]
+    sentence = result[0]["summary"] + "." if result else "Nothing in your memory connects to them yet."
+    return {"person_id": p["id"], "sentence": sentence, "items": result}
+
+
 def cards(store, cid, triage=None):
     conference = require(store, "conference", cid)
     if conference["stage"] != "ready":
@@ -162,7 +209,7 @@ def _job(request):
     return {"id": "job", "type": "user_supplied_job", "text": request.job_description, "url": str(request.job_url)}
 
 
-def _ai_context(p, user, ns, request):
+def _ai_context(p, user, ns, request, remembered=()):
     """Everything the model may use, each item with an id it can cite. Introductions get no notes."""
     notes = [] if request.kind == "introduction" else [{"id": n["id"], "text": n["text"], "created_at": n["created_at"]} for n in ns]
     job = _job(request) if request.job_url else None
@@ -177,12 +224,15 @@ def _ai_context(p, user, ns, request):
             **{k: p.get(k) for k in ("name", "title", "company", "event_role", "topics", "bio")},
         },
         "notes": notes,
+        # From the user's graph memory: earlier meetings with this person, conversations with colleagues.
+        "memory": [{k: m[k] for k in ("id", "type", "summary", "text")} for m in remembered],
         "job": job and {"id": "job", "url": job["url"], "description": job["text"]},
     }
     grounding = [
         {"id": "profile:demo_user", "type": "profile", "text": user["background"]},
         {"id": p["id"], "type": "person", "text": who(p), "sources": p["sources"]},
         *({"id": n["id"], "type": "note", "text": n["text"]} for n in notes),
+        *({"id": m["id"], "type": "memory", "text": f"{m['summary']}: {m['text']}", "path": m["path"]} for m in remembered),
         *([job] if job else []),
     ]
     context["context_items"] = [{"id": g["id"], "type": g["type"]} for g in grounding]
@@ -206,7 +256,7 @@ def make_draft(store, pid, request, settings=None):
         raise HTTPException(503, "AI drafting is not configured; set KAIROS_OPENAI_API_KEY or use template")
     content, mode, model, note = _template(p, user, ns, request), "template", None, None
     if ai_ready and request.generation != "template":
-        context, grounding = _ai_context(p, user, ns, request)
+        context, grounding = _ai_context(p, user, ns, request, memory(store, p)["items"])
         try:
             ai = drafting.generate(context, settings)
         except drafting.DraftingError as exc:

@@ -25,6 +25,7 @@ Rules:
 - kind=referral: reference the conversation in `notes` and the specific job in `job`. Ask conditionally whether they would be comfortable considering a referral if they feel the background fits. Do not assume they can refer.
 - body: under 150 words, greeting with the recipient's first name, signed with the job seeker's name.
 - linkedin_message: under 300 characters, one or two sentences.
+- `memory` holds the job seeker's own earlier interactions from their graph: meetings with this same person at other events, or conversations with the recipient's colleagues. When `memory` is not empty, mention the single most relevant item in one sentence, stated exactly (for example "I also spoke with your colleague Alex at QCon about ..."), and include its id in grounded_on. Never claim a colleague recommended, endorsed or referred the job seeker.
 - grounded_on: the `id` values of the context items you actually used."""
 
 SCHEMA = {
