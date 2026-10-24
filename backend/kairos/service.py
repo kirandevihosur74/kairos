@@ -79,7 +79,7 @@ def cards(store, cid, triage=None):
                 **p,
                 "score": len(topics) / len(user["interests"]),
                 "why": {"sentence": reason, "nodes": nodes, "edges": edges},
-                "who": f"{p['title']} at {p['company']}",
+                "who": f"{p['title']} at {p['company']}" if p["company"] else p["title"],
                 "next_step": f"Ask about their work in {topics[0]}."
                 if topics
                 else "Review their work before reaching out.",
