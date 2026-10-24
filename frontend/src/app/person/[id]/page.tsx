@@ -124,6 +124,7 @@ function PersonPageInner({ id }: { id: string }) {
         <TopBar onBack={() => router.push("/sheet")} />
 
         <PersonHeader person={person} />
+        <Link href={`/person/${encodeURIComponent(person.id)}/glance`} className="text-xs text-alert">Open glance brief →</Link>
 
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between"><SectionLabel>Why them</SectionLabel><Link href={`/person/${encodeURIComponent(person.id)}/graph`} className="text-xs text-alert">View graph →</Link></div>
@@ -190,7 +191,7 @@ function PersonPageInner({ id }: { id: string }) {
               Capture a note
             </Button>
           </Link>
-          <Link href={`/drafts/new?person=${encodeURIComponent(person.id)}`} className="w-full">
+          <Link href={`/drafts/new/type?person=${encodeURIComponent(person.id)}`} className="w-full">
             <Button variant="secondary" size="lg" fullWidth>
               Draft follow-up
             </Button>

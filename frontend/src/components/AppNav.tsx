@@ -41,6 +41,7 @@ export function AppNav() {
 
 function resolveActive(pathname: string, view: string | null): NavKey {
   if (pathname.startsWith("/sheet")) return "sheet";
+  if (pathname.startsWith("/graph") || pathname.startsWith("/everyone") || pathname.startsWith("/topic")) return "discover";
   if (pathname.startsWith("/today") || pathname.startsWith("/recap")) {
     return "today";
   }

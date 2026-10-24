@@ -184,7 +184,7 @@ function Ready({ draftId }: { draftId: string }) {
             size="lg"
             fullWidth
             onClick={() =>
-              router.push(`/drafts/new?person=${encodeURIComponent(draft.person_id)}`)
+              router.push(`/drafts/new/type?person=${encodeURIComponent(draft.person_id)}`)
             }
           >
             New draft

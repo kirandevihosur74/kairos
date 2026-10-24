@@ -15,6 +15,7 @@ function DiscoverDeck() {
   const params = useSearchParams();
   const reviewSkipped = params.get("review") === "skipped";
   const capture = params.get("capture") === "1";
+  const topic = params.get("topic");
   const legacySheet = params.get("view") === "sheet";
   const { conferenceId, setCurrentPersonId } = useSession();
   const { showToast } = useToast();
@@ -31,13 +32,13 @@ function DiscoverDeck() {
     api.listPeople(conferenceId, "all").then(
       (people) => {
         if (cancelled) return;
-        const queue = people.filter((p) => capture || (reviewSkipped ? p.triage === "not_interesting" : p.triage === null)).map((p) => p.id);
+        const queue = people.filter((p) => (!topic || p.topics.some((t) => t.toLowerCase() === topic.toLowerCase())) && (capture || (reviewSkipped ? p.triage === "not_interesting" : p.triage === null))).map((p) => p.id);
         setData({ people, queue, index: 0 }); setError(null);
       },
       (err) => { if (!cancelled) setError(describeError(err, "Could not load the room.")); },
     );
     return () => { cancelled = true; };
-  }, [conferenceId, router, retry, reviewSkipped, capture, legacySheet]);
+  }, [conferenceId, router, retry, reviewSkipped, capture, legacySheet, topic]);
 
   const current = data?.people.find((p) => p.id === data.queue[data.index]);
   useEffect(() => { if (current) setCurrentPersonId(current.id); }, [current, setCurrentPersonId]);
@@ -60,8 +61,9 @@ function DiscoverDeck() {
       <div className="flex flex-col gap-3"><Button fullWidth onClick={() => router.push("/sheet?view=skipped")}>Review skipped</Button><Button variant="primary" fullWidth onClick={() => router.push(data.people.length ? "/sheet" : "/events")}>{data.people.length ? "Open shortlist →" : "Your events →"}</Button></div>
     </div> : <div className="flex flex-1 flex-col gap-3 px-4 pb-5">
       <div className="flex items-center justify-between"><button aria-label="Back to Today" onClick={() => router.push("/today")} className="flex h-8 w-8 items-center"><DesignIcon name="back" /></button><span className="text-[14px]">{data.index + 1} of {data.queue.length}</span><button aria-label="Discovery options" aria-expanded={filters} onClick={() => setFilters(!filters)} className="flex h-8 w-8 items-center justify-end"><DesignIcon name="filter" /></button></div>
-      {filters && <div className="flex flex-wrap gap-3 rounded-xl border border-line bg-card p-3 text-[13px]"><Link href="/profile" className="text-alert">Edit interests</Link><Link href="/sheet" className="text-alert">Your shortlist</Link><Link href="/sheet?view=skipped" className="text-alert">Review skipped</Link><Link href="/events" className="text-alert">Switch event</Link></div>}
-      <h1 className="font-serif text-[29px] leading-[1.3] tracking-[-0.01em]">{capture ? "Who did you meet?" : reviewSkipped ? "Another look." : "Who’s in the room?"}</h1>
+      {filters && <div className="flex flex-wrap gap-3 rounded-xl border border-line bg-card p-3 text-[13px]"><Link href="/graph" className="text-alert">Your graph</Link><Link href="/everyone" className="text-alert">Everyone</Link><Link href="/profile" className="text-alert">Edit interests</Link><Link href="/sheet" className="text-alert">Your shortlist</Link><Link href="/sheet?view=skipped" className="text-alert">Review skipped</Link><Link href="/events" className="text-alert">Switch event</Link></div>}
+      <h1 className="font-serif text-[29px] leading-[1.3] tracking-[-0.01em]">{capture ? "Who did you meet?" : reviewSkipped ? "Another look." : topic ? `People into ${topic}` : "Who’s in the room?"}</h1>
+      {!capture && <div className="flex gap-4 text-xs text-muted"><Link href="/graph">Your graph →</Link><Link href="/everyone">Everyone →</Link></div>}
       {capture && <p className="text-sm text-muted">Find the person, then tap Add a note.</p>}
       <article className="overflow-hidden rounded-xl border border-line bg-card">
         <Link href={`/person/${encodeURIComponent(current.id)}`} className="relative block h-[clamp(160px,32dvh,280px)]">
