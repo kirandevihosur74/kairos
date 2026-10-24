@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-type Size = "sm" | "md" | "lg" | "xl";
+type Size = "sm" | "md" | "lg" | "xl" | "ring";
 
 export interface AvatarProps {
   name: string;
@@ -14,6 +14,7 @@ const sizeMap: Record<Size, { px: number; cls: string; text: string }> = {
   md: { px: 36, cls: "h-9 w-9", text: "text-xs" },
   lg: { px: 48, cls: "h-12 w-12", text: "text-sm" },
   xl: { px: 64, cls: "h-16 w-16", text: "text-base" },
+  ring: { px: 96, cls: "h-24 w-24", text: "text-[40px]" },
 };
 
 function initials(name: string): string {
@@ -47,6 +48,22 @@ export function Avatar({ name, src, size = "md", className }: AvatarProps) {
           className,
         )}
       />
+    );
+  }
+
+  if (size === "ring") {
+    return (
+      <span
+        aria-label={name}
+        className={cn(
+          dims.cls,
+          dims.text,
+          "inline-flex items-center justify-center rounded-full bg-transparent text-ink border border-line font-serif leading-none select-none",
+          className,
+        )}
+      >
+        {label}
+      </span>
     );
   }
 

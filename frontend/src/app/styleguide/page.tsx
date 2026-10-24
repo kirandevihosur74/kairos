@@ -24,8 +24,8 @@ export default function StyleguidePage() {
             Kairos foundation
           </h1>
           <p className="text-sm text-muted">
-            Instrument Sans for body, Instrument Serif for headlines. Spectrum
-            gradient only on one primary action per screen.
+            Instrument Sans for body, Instrument Serif for headlines. Buttons are
+            solid ink; gradient is reserved for the mic FAB and progress.
           </p>
         </header>
 
@@ -35,16 +35,17 @@ export default function StyleguidePage() {
             <Swatch name="card" value="#FFFFFF" className="bg-card border border-line" />
             <Swatch name="subtle" value="#F1F1EF" className="bg-subtle" />
             <Swatch name="line" value="#E9E9E7" className="bg-line" />
-            <Swatch name="ink" value="#37352F" className="bg-ink" dark />
-            <Swatch name="muted" value="#787774" className="bg-muted" dark />
-            <Swatch name="faint" value="#9B9A97" className="bg-faint" dark />
+            <Swatch name="ink" value="#37352F" className="bg-ink" />
+            <Swatch name="muted" value="#787774" className="bg-muted" />
+            <Swatch name="faint" value="#9B9A97" className="bg-faint" />
             <Swatch name="cream" value="#FBF3DB" className="bg-cream" />
-            <Swatch name="alert" value="#C2493A" className="bg-alert" dark />
-            <Swatch name="amber" value="#D67D00" className="bg-amber" dark />
+            <Swatch name="alert" value="#C2493A" className="bg-alert" />
+            <Swatch name="amber" value="#D67D00" className="bg-amber" />
           </div>
           <div className="mt-3 h-10 w-full rounded-full bg-spectrum" />
           <p className="mt-2 text-xs text-faint">
-            Spectrum: #F7D84A → #F2A14B → #EF8474 → #EE9BB5
+            Spectrum: #F7D84A → #F2A14B → #EF8474 → #EE9BB5. Used for the mic FAB
+            and progress fills.
           </p>
         </Section>
 
@@ -61,12 +62,16 @@ export default function StyleguidePage() {
 
         <Section title="Buttons">
           <div className="flex flex-col gap-3">
-            <Button variant="primary" fullWidth>
-              Primary action
+            <Button variant="primary" size="lg" fullWidth>
+              Primary ink pill
             </Button>
             <div className="flex gap-2">
-              <Button variant="secondary">Secondary</Button>
-              <Button variant="ghost">Ghost</Button>
+              <Button variant="secondary" size="lg">
+                Secondary
+              </Button>
+              <Button variant="ghost" size="lg">
+                Ghost
+              </Button>
             </div>
             <div className="flex gap-2">
               <Button variant="secondary" size="sm">
@@ -79,23 +84,36 @@ export default function StyleguidePage() {
                 Large
               </Button>
             </div>
-            <Button variant="secondary" disabled>
+            <Button variant="primary" disabled>
               Disabled
             </Button>
           </div>
           <p className="mt-2 text-xs text-faint">
-            One gradient primary per screen; everything else is outline or ghost.
+            Every primary is solid ink. No gradient on buttons.
+          </p>
+        </Section>
+
+        <Section title="Progress">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-subtle">
+            <div className="h-full w-2/3 rounded-full bg-spectrum" />
+          </div>
+          <p className="mt-1 text-xs text-faint">
+            Progress fills use the spectrum gradient.
           </p>
         </Section>
 
         <Section title="Chips">
           <div className="flex flex-wrap gap-2">
-            <Chip>python</Chip>
-            <Chip>distributed systems</Chip>
-            <Chip tone="outline">Backend engineer</Chip>
-            <Chip tone="cream">Interesting</Chip>
-            <Chip tone="amber">Follow up</Chip>
-            <Chip tone="alert">Needs attention</Chip>
+            <Chip tone="outline">Sample data</Chip>
+            <Chip tone="outline">You</Chip>
+            <Chip tone="outline">→ Backend engineer</Chip>
+            <Chip tone="on">→ python</Chip>
+            <Chip tone="on">distributed systems</Chip>
+            <Chip tone="suggest">+ typescript</Chip>
+            <Chip tone="neutral">neutral</Chip>
+            <Chip tone="cream">interesting</Chip>
+            <Chip tone="amber">follow up</Chip>
+            <Chip tone="alert">needs attention</Chip>
           </div>
         </Section>
 
@@ -106,20 +124,31 @@ export default function StyleguidePage() {
             <Avatar name="Taylor Chen" size="lg" />
             <Avatar name="Casey Patel" size="xl" />
           </div>
+          <div className="mt-3 flex items-center justify-center rounded-[16px] bg-subtle py-6">
+            <Avatar name="Alex Morgan" size="ring" />
+          </div>
+          <p className="mt-1 text-xs text-faint">
+            Ring variant for person headers — hollow, serif initials.
+          </p>
         </Section>
 
-        <Section title="Card">
+        <Section title="Card radii">
           <Card>
+            <p className="text-sm text-muted">
+              Card radius=&ldquo;md&rdquo; (12px) — default.
+            </p>
+          </Card>
+          <Card radius="lg">
             <div className="flex items-start gap-3">
               <Avatar name="Alex Morgan" size="lg" />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <p className="truncate font-medium text-ink">Alex Morgan</p>
                 <p className="truncate text-sm text-muted">
-                  Backend Engineering Lead · Example Build Co
+                  radius=&ldquo;lg&rdquo; (16px) for people cards.
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Chip>python</Chip>
-                  <Chip>distributed systems</Chip>
+                  <Chip tone="on">python</Chip>
+                  <Chip tone="on">distributed systems</Chip>
                 </div>
               </div>
             </div>
@@ -128,7 +157,7 @@ export default function StyleguidePage() {
 
         <Section title="Bottom nav">
           <p className="text-xs text-faint">
-            Fixed to the viewport bottom; tap items to toggle.
+            Fixed to the viewport bottom; mic FAB uses the gradient.
           </p>
           <div className="mt-3 rounded-[12px] border border-dashed border-line p-3 text-center text-xs text-faint">
             Current: {nav}
@@ -160,18 +189,16 @@ function Swatch({
   name,
   value,
   className,
-  dark,
 }: {
   name: string;
   value: string;
   className: string;
-  dark?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1">
       <div className={`h-14 w-full rounded-[12px] ${className}`} />
       <div className="flex items-baseline justify-between">
-        <span className={`text-xs ${dark ? "text-ink" : "text-ink"}`}>{name}</span>
+        <span className="text-xs text-ink">{name}</span>
         <span className="text-[10px] text-faint">{value}</span>
       </div>
     </div>
