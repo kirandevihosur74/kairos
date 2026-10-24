@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   AppNav,
@@ -51,14 +51,17 @@ const OPTIONS: Option[] = [
 function NewDraft() {
   const router = useRouter();
   const search = useSearchParams();
+  const pathname = usePathname();
+  const step: Step = pathname.endsWith("/referral") ? "referral" : "choose";
   const personId = search.get("person");
   const { conferenceId } = useSession();
 
   const [person, setPerson] = useState<PersonCard | null>(null);
   const [personError, setPersonError] = useState<string | null>(null);
 
-  const [kind, setKind] = useState<DraftKind>("follow_up");
-  const [step, setStep] = useState<Step>("choose");
+  const requested = search.get("kind");
+  const [choice, setKind] = useState<DraftKind>(requested === "introduction" || requested === "referral" ? requested : "follow_up");
+  const kind: DraftKind = step === "referral" ? "referral" : choice;
 
   const [jobUrl, setJobUrl] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -93,12 +96,13 @@ function NewDraft() {
 
   const activeOption = OPTIONS.find((o) => o.kind === kind) ?? OPTIONS[0];
 
-  const canContinue = Boolean(personId && conferenceId);
+  const needsNote = kind !== "introduction" && !person?.notes.length;
+  const canContinue = Boolean(personId && conferenceId && person && !personError && !needsNote);
   const canSubmitReferral =
     jobUrl.trim().length > 0 && jobDescription.trim().length > 0;
 
   async function onSubmit() {
-    if (!personId || !conferenceId) {
+    if (!personId || !conferenceId || submitting || needsNote) {
       setSubmitError("Missing person or event. Head back to Discover.");
       return;
     }
@@ -132,7 +136,7 @@ function NewDraft() {
 
   function onPrimary() {
     if (step === "choose" && kind === "referral") {
-      setStep("referral");
+      router.push(`/drafts/new/referral?person=${encodeURIComponent(personId!)}`);
       return;
     }
     void onSubmit();
@@ -142,7 +146,7 @@ function NewDraft() {
     step === "referral" ? (
       <button
         type="button"
-        onClick={() => setStep("choose")}
+        onClick={() => router.push(`/drafts/new/type?person=${encodeURIComponent(personId ?? "")}&kind=referral`)}
         className="text-[15px] font-medium text-ink"
       >
         ‹ Draft type
@@ -262,8 +266,10 @@ function NewDraft() {
           </div>
         )}
 
+        {needsNote && person && <p className="pt-4 text-[13px] text-muted">Save a meeting note before a follow-up or referral. <button type="button" className="text-alert underline" onClick={() => router.push(`/person/${encodeURIComponent(person.id)}/note`)}>Capture a note</button>, or choose Introduction.</p>}
+
         {submitError ? (
-          <p className="pt-3 text-[13px] text-alert">{submitError}</p>
+          <p role="alert" className="pt-3 text-[13px] text-alert">{submitError}</p>
         ) : null}
 
         {/* Sticky above the floating bottom nav. */}
@@ -280,7 +286,7 @@ function NewDraft() {
             }
             trailing={<span aria-hidden>→</span>}
           >
-            {submitting ? "Writing…" : activeOption.cta}
+            {submitting ? "Writing…" : step === "referral" ? "Write referral request →" : activeOption.cta}
           </Button>
         </div>
       </div>
