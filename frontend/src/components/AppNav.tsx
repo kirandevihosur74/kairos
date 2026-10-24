@@ -24,11 +24,11 @@ export function AppNav() {
         if (currentPersonId) {
           router.push(`/person/${encodeURIComponent(currentPersonId)}/note`);
         } else {
-          router.push("/discover");
+          router.push("/discover?capture=1");
         }
         return;
       case "sheet":
-        router.push("/discover?view=sheet");
+        router.push("/sheet");
         return;
       case "drafts":
         router.push("/drafts");
@@ -40,6 +40,7 @@ export function AppNav() {
 }
 
 function resolveActive(pathname: string, view: string | null): NavKey {
+  if (pathname.startsWith("/sheet")) return "sheet";
   if (pathname.startsWith("/today") || pathname.startsWith("/recap")) {
     return "today";
   }

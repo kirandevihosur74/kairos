@@ -63,7 +63,7 @@ function DraftReview({ draftId }: { draftId: string }) {
         setBody(d.body);
         setLinkedinMessage(d.linkedin_message);
         try {
-          const cid = conferenceId ?? d.conference_id;
+          const cid = d.conference_id;
           const p = await api.getPerson(d.person_id, cid);
           if (!cancelled) setPerson(p);
         } catch {

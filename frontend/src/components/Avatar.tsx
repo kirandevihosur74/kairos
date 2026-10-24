@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 
 type Size = "sm" | "md" | "lg" | "xl" | "ring";
 
@@ -32,16 +35,19 @@ function cn(...parts: Array<string | false | undefined>): string {
 }
 
 export function Avatar({ name, src, size = "md", className }: AvatarProps) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const dims = sizeMap[size];
   const label = initials(name);
 
-  if (src) {
+  if (src && src !== failedSrc) {
     return (
       <Image
         src={src}
         alt={name}
         width={dims.px}
         height={dims.px}
+        unoptimized
+        onError={() => setFailedSrc(src)}
         className={cn(
           dims.cls,
           "rounded-full object-cover border border-line",

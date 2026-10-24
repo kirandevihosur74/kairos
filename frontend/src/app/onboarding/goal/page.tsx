@@ -30,7 +30,7 @@ export default function OnboardingGoalPage() {
 
   const canContinue =
     draft.name.trim().length > 0 &&
-    (draft.target_roles.length > 0 || draft.interests.length > 0);
+    draft.target_roles.length > 0 && draft.interests.length > 0;
 
   const onSubmit = async () => {
     setSaving(true);
@@ -70,6 +70,9 @@ export default function OnboardingGoalPage() {
         </div>
 
         <div className="flex flex-col gap-5">
+          <label className="flex flex-col gap-2 text-[13px] font-medium">Name
+            <input value={draft.name} maxLength={200} onChange={(e) => persist({ ...draft, name: e.target.value })} autoComplete="name" placeholder="Your name" className="rounded-xl border border-line bg-card px-4 py-3 text-[15px]" />
+          </label>
           <div className="flex flex-col gap-3">
             <SectionLabel>Target roles</SectionLabel>
             <ChipField

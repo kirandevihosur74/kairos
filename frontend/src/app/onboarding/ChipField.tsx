@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type KeyboardEvent } from "react";
-import { Chip } from "@/components";
 import { dedupe } from "./draft";
 
 export interface ChipFieldProps {
@@ -53,18 +52,18 @@ export function ChipField({
       </div>
       <div className="flex flex-wrap gap-2">
         {values.map((value) => (
-          <Chip
+          <button
             key={value}
-            tone="on"
-            className="cursor-pointer"
+            type="button"
+            className="rounded-full bg-cream px-3 py-[7px] text-[13px]"
             onClick={() => remove(value)}
-            role="button"
             aria-label={`Remove ${value}`}
           >
             {value} <span className="text-muted">×</span>
-          </Chip>
+          </button>
         ))}
         <input
+          aria-label={label || placeholder}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}

@@ -119,12 +119,12 @@ function PersonPageInner({ id }: { id: string }) {
   return (
     <PhoneShell>
       <div className="flex flex-1 flex-col gap-5 px-5 pb-10 pt-2">
-        <TopBar onBack={() => router.back()} />
+        <TopBar onBack={() => router.push("/sheet")} />
 
         <PersonHeader person={person} />
 
         <section className="flex flex-col gap-2">
-          <SectionLabel>Why them</SectionLabel>
+          <div className="flex items-center justify-between"><SectionLabel>Why them</SectionLabel><Link href={`/person/${encodeURIComponent(person.id)}/graph`} className="text-xs text-alert">View graph →</Link></div>
           <Card radius="lg" padded className="flex flex-col gap-4">
             <WhyPathDiagram why={person.why} personName={person.name} />
           </Card>
@@ -176,6 +176,8 @@ function PersonPageInner({ id }: { id: string }) {
           </section>
         ) : null}
 
+        <Link href={`/person/${encodeURIComponent(person.id)}/graph?tab=memory`} className="flex items-center justify-between rounded-xl bg-subtle px-4 py-3 text-sm">What Kairos remembers <span>→</span></Link>
+
         {conferenceId ? <MemorySection personId={person.id} conferenceId={conferenceId} /> : null}
 
         <NotesHistory notes={person.notes} />
@@ -220,14 +222,14 @@ function PersonHeader({ person }: { person: PersonCard }) {
   const sampleData = person.data_mode === "fixture";
   const matchLabel =
     person.match_confidence === "high"
-      ? "Matches high"
+      ? "High confidence"
       : person.match_confidence === "medium"
-        ? "Matches medium"
-        : "Matches low";
+        ? "Medium confidence"
+        : "Low confidence";
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-start gap-4">
-        <Avatar name={person.name} src={person.photo_url} size="ring" />
+      <div className="flex items-start gap-3.5">
+        <Avatar name={person.name} src={person.photo_url} size="xl" />
         <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
           <h1 className="font-serif text-[28px] leading-[1.05] text-ink">
             {person.name}
@@ -238,6 +240,7 @@ function PersonHeader({ person }: { person: PersonCard }) {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {person.triage === "interesting" ? <Chip tone="on">Interesting</Chip> : null}
         {person.met ? <Chip tone="on">Met</Chip> : null}
         {sampleData ? <Chip tone="outline">Sample data</Chip> : null}
         <Chip tone="outline">{matchLabel}</Chip>

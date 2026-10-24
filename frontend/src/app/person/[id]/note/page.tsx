@@ -84,7 +84,7 @@ function NoteCaptureInner({ id }: { id: string }) {
     try {
       await api.saveMetNote(conferenceId, person.id, text.trim());
       showToast(`Note saved to ${firstName(person.name)}'s memory`);
-      router.replace(`/person/${encodeURIComponent(person.id)}`);
+      router.replace("/today");
     } catch (err) {
       setSaving(false);
       setError(
@@ -172,6 +172,7 @@ function NoteCaptureInner({ id }: { id: string }) {
         <div className="flex flex-col gap-2">
           <SectionLabel>Note</SectionLabel>
           <textarea
+              maxLength={4000}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="They mentioned flaky tests cost about a day every sprint. Wants a demo next week."

@@ -97,7 +97,7 @@ export function useSession(): SessionContextValue {
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const setConferenceId = useCallback((id: string | null) => {
-    current = { ...current, conferenceId: id };
+    current = { ...current, conferenceId: id, currentPersonId: null };
     persist();
     notify();
   }, []);

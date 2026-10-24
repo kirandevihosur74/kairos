@@ -3,201 +3,43 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  AppNav,
-  Avatar,
-  Button,
-  Card,
-  PhoneShell,
-  RequireProfile,
-  SectionLabel,
-} from "@/components";
-import { ApiError, api, type PersonCard } from "@/lib/api";
+import { AppNav, Avatar, Button, Card, PhoneShell, RequireProfile } from "@/components";
+import { LoadMessage } from "@/components/LoadMessage";
+import { api, type Conference, type PersonCard, type Profile } from "@/lib/api";
+import { eventDate, eventPhase } from "@/lib/events";
 import { useSession } from "@/lib/session";
+import { describeError } from "../onboarding/draft";
 
-export default function TodayPage() {
-  return (
-    <RequireProfile>
-      <TodayView />
-    </RequireProfile>
-  );
-}
-
-function TodayView() {
+function Today({ profile }: { profile: Profile }) {
   const router = useRouter();
   const { conferenceId, setCurrentPersonId } = useSession();
-  const [state, setState] = useState<
-    | { kind: "loading" }
-    | { kind: "ready"; people: PersonCard[] }
-    | { kind: "error" }
-  >({ kind: "loading" });
-
+  const [data, setData] = useState<{ people: PersonCard[]; conference: Conference } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [now] = useState(() => Date.now());
   useEffect(() => {
-    if (!conferenceId) {
-      router.replace("/event");
-      return;
-    }
+    if (!conferenceId) { router.replace("/events"); return; }
     let cancelled = false;
-    api.priorities(conferenceId).then(
-      (people) => {
-        if (cancelled) return;
-        setState({ kind: "ready", people: people.slice(0, 3) });
-      },
-      (err) => {
-        if (cancelled) return;
-        if (err instanceof ApiError) {
-          setState({ kind: "error" });
-          return;
-        }
-        setState({ kind: "error" });
-      },
+    Promise.all([api.listPeople(conferenceId, "interesting"), api.getConferenceStatus(conferenceId)]).then(
+      ([people, conference]) => { if (!cancelled) { setData({ people, conference }); setError(null); } },
+      (err) => { if (!cancelled) setError(describeError(err, "Could not load your day.")); },
     );
-    return () => {
-      cancelled = true;
-    };
-  }, [conferenceId, router]);
+    return () => { cancelled = true; };
+  }, [conferenceId, router, retry]);
+  function open(person: PersonCard) { setCurrentPersonId(person.id); router.push(`/person/${encodeURIComponent(person.id)}`); }
+  const first = data?.people.find((p) => !p.met) ?? data?.people[0];
 
-  function openPerson(person: PersonCard) {
-    setCurrentPersonId(person.id);
-    router.push(`/person/${encodeURIComponent(person.id)}`);
-  }
-
-  if (!conferenceId) {
-    return (
-      <PhoneShell>
-        <div className="flex flex-1 items-center justify-center">
-          <span className="text-sm text-muted">Loading…</span>
-        </div>
-        <AppNav />
-      </PhoneShell>
-    );
-  }
-
-  return (
-    <PhoneShell>
-      <div className="flex flex-1 flex-col gap-5 px-4 pb-10 pt-4">
-        <header className="flex flex-col gap-2 px-2">
-          <SectionLabel>Today</SectionLabel>
-          <h1 className="font-serif text-[34px] leading-[1.05] tracking-[-0.01em] text-ink">
-            Who to find first.
-          </h1>
-          <p className="text-sm text-muted">
-            Your top three priorities from the shortlist. Tap a row to open the
-            person.
-          </p>
-        </header>
-
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between px-2">
-            <p className="text-[15px] text-ink">Your top 3</p>
-            <Link
-              href="/discover"
-              className="text-[13px] font-medium text-alert"
-            >
-              See all
-            </Link>
-          </div>
-
-          {state.kind === "loading" && (
-            <Card radius="lg" padded>
-              <p className="text-sm text-muted">Loading your priorities…</p>
-            </Card>
-          )}
-
-          {state.kind === "error" && (
-            <Card radius="lg" padded>
-              <p className="text-sm text-muted">Could not load priorities.</p>
-            </Card>
-          )}
-
-          {state.kind === "ready" && state.people.length === 0 && (
-            <Card radius="lg" padded>
-              <p className="text-sm text-muted">
-                No priorities yet. Review your shortlist in Discover.
-              </p>
-            </Card>
-          )}
-
-          {state.kind === "ready" && state.people.length > 0 && (
-            <Card radius="lg" padded={false}>
-              <ul className="flex flex-col">
-                {state.people.map((person, index) => (
-                  <li
-                    key={person.id}
-                    className={
-                      index === 0 ? "" : "border-t border-line"
-                    }
-                  >
-                    <button
-                      type="button"
-                      onClick={() => openPerson(person)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left"
-                    >
-                      <span className="w-4 shrink-0 text-[15px] text-alert">
-                        {index + 1}
-                      </span>
-                      <Avatar
-                        name={person.name}
-                        src={person.photo_url}
-                        size="lg"
-                      />
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate text-[14px] text-ink">
-                          {person.name}
-                        </span>
-                        {(person.title || person.company) && (
-                          <span className="truncate text-[12px] text-muted">
-                            {[person.title, person.company]
-                              .filter(Boolean)
-                              .join(" @ ")}
-                          </span>
-                        )}
-                        {whyLine(person) && (
-                          <span className="truncate text-[12px] text-muted">
-                            {whyLine(person)}
-                          </span>
-                        )}
-                      </span>
-                      <span
-                        aria-hidden
-                        className="shrink-0 text-[18px] leading-none text-faint"
-                      >
-                        →
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-        </section>
-
-        <div className="flex flex-col gap-2 px-2 pt-2">
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={() => router.push("/discover")}
-          >
-            Open discover
-          </Button>
-          <Button
-            variant="secondary"
-            size="lg"
-            fullWidth
-            onClick={() => router.push("/recap")}
-          >
-            See today&apos;s recap
-          </Button>
-        </div>
-      </div>
-      <AppNav />
-    </PhoneShell>
-  );
+  return <PhoneShell><div className="flex flex-1 flex-col gap-4 px-4 pt-1 pb-6">
+    <header className="flex items-center justify-between"><Link href="/events" className="font-serif text-[25px]" aria-label="Kairos · your events">kairos</Link><div className="flex items-center gap-3"><Link href="/events" className="text-xs text-muted">Your events</Link><Link href="/profile" aria-label="Edit profile"><Avatar name={profile.name} size="md" /></Link></div></header>
+    {error ? <LoadMessage error={error} onRetry={() => setRetry((n) => n + 1)} /> : !data ? <LoadMessage loading /> : <>
+      <Link href="/events" className="rounded-xl bg-ink p-4 text-white"><span className="inline-block rounded-full bg-white/15 px-2.5 py-1 text-[10px]">{data.conference.data_mode === "fixture" ? "Sample event" : eventPhase(data.conference, now) === "now" ? "Live now" : data.conference.stale ? "Saved snapshot" : "Your event"}</span><h1 className="mt-2 font-serif text-[26px] leading-tight">{data.conference.name || "Your event"}</h1><p className="mt-1 text-[13px] text-white/75">{[data.conference.city, eventDate(data.conference), `${data.people.length} shortlisted`].filter(Boolean).join(" · ")}</p></Link>
+      {first && <section><h2 className="mb-3 text-[14px]">Up next</h2><button onClick={() => open(first)} className="flex w-full items-center gap-3 rounded-xl bg-cream p-4 text-left"><Avatar name={first.name} src={first.photo_url} size="lg" className="shrink-0 rounded-xl" /><span><span className="block text-[14px]">{first.name}</span><span className="mt-1 block text-xs leading-relaxed text-muted">{first.notes.at(-1)?.text || first.next_step}</span></span></button></section>}
+      <section><div className="mb-3 flex items-center justify-between"><h2 className="text-[14px]">Your top 3</h2><Link href="/sheet" className="text-[13px] text-alert">See all</Link></div>
+        {data.people.length ? <Card padded={false} radius="lg"><ol>{data.people.slice(0, 3).map((person, i) => <li key={person.id} className={i ? "border-t border-line" : ""}><button onClick={() => open(person)} className="flex w-full items-center gap-3 px-3 py-3 text-left"><span className="text-[14px] text-alert">{i + 1}</span><Avatar name={person.name} src={person.photo_url} size="lg" className="shrink-0 rounded-xl" /><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-1.5 text-[14px]">{person.name}<span className={`rounded-full px-2 py-0.5 text-[10px] ${person.met ? "bg-cream" : "bg-subtle text-muted"}`}>{person.met ? "✓ Met" : "Not met"}</span></span><span className="mt-1 block truncate text-xs text-muted">{person.notes.at(-1)?.text || person.next_step}</span></span><span className="text-faint">›</span></button></li>)}</ol></Card> : <Card padded><p className="text-sm leading-relaxed text-muted">Your shortlist starts in Discover. Mark someone interesting, then find them here.</p></Card>}
+      </section>
+      <div className="mt-2 flex gap-2"><Button fullWidth variant="primary" onClick={() => router.push("/discover")}>Discover people</Button><Button fullWidth className="border-line" onClick={() => router.push("/recap")}>Day recap</Button></div>
+      <Link href="/profile" className="self-center py-2 text-xs text-muted">Refine your interests →</Link>
+    </>}
+  </div><AppNav /></PhoneShell>;
 }
-
-function whyLine(person: PersonCard): string | null {
-  if (person.next_step) return person.next_step;
-  if (person.why?.sentence) return person.why.sentence;
-  return null;
-}
+export default function TodayPage() { return <RequireProfile>{(profile) => <Today profile={profile} />}</RequireProfile>; }
