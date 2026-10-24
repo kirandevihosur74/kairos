@@ -1,7 +1,6 @@
 import io
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
 from fastapi.testclient import TestClient
 from kairos.app import create_app
 from kairos.config import Settings
@@ -14,12 +13,6 @@ PROFILE = {
     "interests": ["Python", "Distributed Systems"],
     "background": "I build APIs.",
 }
-
-
-@pytest.fixture
-def client(settings):
-    with TestClient(create_app(settings)) as c:
-        yield c
 
 
 def seed(client):

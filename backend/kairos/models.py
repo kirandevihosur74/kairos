@@ -60,6 +60,8 @@ class DraftInput(Input):
     kind: Literal["introduction", "follow_up", "referral"] = "follow_up"
     job_url: HttpUrl | None = None
     job_description: str = Field(default="", max_length=10000)
+    # auto: AI when configured, otherwise (or on provider failure) a template draft labeled as such.
+    generation: Literal["auto", "ai", "template"] = "auto"
 
 
 class DraftEdit(Input):

@@ -4,6 +4,8 @@ import os
 from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
+from kairos.app import create_app
 from kairos.config import Settings
 
 
@@ -26,3 +28,9 @@ def settings(request, tmp_path):
         db = FalkorDB.from_url(value.falkordb_url)
         db.select_graph(value.graph_name).delete()
         db.connection.close()
+
+
+@pytest.fixture
+def client(settings):
+    with TestClient(create_app(settings)) as c:
+        yield c

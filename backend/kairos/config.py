@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,3 +18,11 @@ class Settings(BaseSettings):
     snapshot_dir: Path = Path("backend/data/snapshots")
     snapshot_max_age_hours: float = 24
     openai_api_key: str = ""
+    openai_model: str = "gpt-6-astra"
+    openai_timeout: float = 30
+
+    @field_validator("openai_model")
+    @classmethod
+    def default_model(cls, value):
+        # An empty KAIROS_OPENAI_MODEL= line in .env means "use the default", not "no model".
+        return value.strip() or "gpt-6-astra"

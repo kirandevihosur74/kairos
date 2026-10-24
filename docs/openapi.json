@@ -1152,6 +1152,16 @@
             "maxLength": 10000,
             "title": "Job Description",
             "default": ""
+          },
+          "generation": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ai",
+              "template"
+            ],
+            "title": "Generation",
+            "default": "auto"
           }
         },
         "additionalProperties": false,

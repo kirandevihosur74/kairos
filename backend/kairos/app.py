@@ -100,7 +100,7 @@ def create_app(settings: Settings | None = None):
             "ingestion": "fixture_and_luma"
             if settings.brightdata_api_key and settings.brightdata_zone
             else "fixture_only",
-            "draft_generation": "template",
+            "draft_generation": "openai" if settings.openai_api_key else "template",
         }
 
     @app.get(api + "/profile", dependencies=protected)
@@ -281,7 +281,7 @@ def create_app(settings: Settings | None = None):
 
     @app.post(api + "/followups/{pid}/draft", status_code=201, dependencies=protected)
     def draft(pid: str, body: DraftInput):
-        value = make_draft(store(), pid, body)
+        value = make_draft(store(), pid, body, settings)
         value["draft_id"] = value["id"]
         return store().put("draft", value)
 

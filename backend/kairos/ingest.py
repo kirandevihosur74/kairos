@@ -34,6 +34,11 @@ TOPICS = {
     "education": ("university", "educator", "academy"),
     "startups": ("startup", "startups", "co-founder", "founder"),
     "knowledge systems": ("knowledge systems",),
+    # Backend-career topics, so the "I'm looking for backend roles" persona can match real people.
+    "backend": ("backend", "back-end", "back end", "api", "apis"),
+    "infrastructure": ("infrastructure", "infra", "devops", "sre", "site reliability", "cloud", "platform engineering"),
+    "distributed systems": ("distributed systems", "distributed system", "scalability", "scalable systems"),
+    "data engineering": ("data engineering", "data engineer", "data platform", "database", "databases"),
 }
 
 
