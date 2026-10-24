@@ -29,7 +29,7 @@ function RecapView() {
   const { conferenceId, setCurrentPersonId } = useSession();
   const [state, setState] = useState<
     | { kind: "loading" }
-    | { kind: "ready"; people: PersonCard[] }
+    | { kind: "ready"; people: PersonCard[]; drafts: number; eventName: string | null }
     | { kind: "error" }
   >({ kind: "loading" });
 
@@ -39,10 +39,14 @@ function RecapView() {
       return;
     }
     let cancelled = false;
-    api.listPeople(conferenceId, "interesting").then(
-      (people) => {
+    Promise.all([
+      api.listPeople(conferenceId, "interesting"),
+      api.listDrafts(conferenceId),
+      api.getConferenceStatus(conferenceId),
+    ]).then(
+      ([people, drafts, conference]) => {
         if (cancelled) return;
-        setState({ kind: "ready", people });
+        setState({ kind: "ready", people, drafts: drafts.length, eventName: conference.name });
       },
       (err) => {
         if (cancelled) return;
@@ -77,7 +81,8 @@ function RecapView() {
   const people = state.kind === "ready" ? state.people : [];
   const met = people.filter((p) => p.met !== null);
   const notMet = people.filter((p) => p.met === null);
-  const draftsReady = people.filter((p) => p.triage === "interesting").length;
+  const draftsReady = state.kind === "ready" ? state.drafts : 0;
+  const eventName = (state.kind === "ready" && state.eventName) || "Your event";
 
   const total = people.length;
   const metCount = met.length;
@@ -87,7 +92,7 @@ function RecapView() {
     <PhoneShell>
       <div className="flex flex-1 flex-col gap-5 px-5 pb-10 pt-4">
         <header className="flex flex-col gap-3">
-          <SectionLabel>Patch the Conference · wrapped</SectionLabel>
+          <SectionLabel>{eventName} · wrapped</SectionLabel>
           <h1 className="font-serif text-[38px] leading-[1.02] tracking-[-0.01em] text-ink">
             {headline(metCount, total)}
           </h1>
@@ -151,7 +156,7 @@ function RecapView() {
                           {person.name}
                         </span>
                         <span className="truncate text-[12px] text-muted">
-                          {person.met?.text ??
+                          {person.notes.at(-1)?.text ??
                             person.next_step ??
                             [person.title, person.company]
                               .filter(Boolean)

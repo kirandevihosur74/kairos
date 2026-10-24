@@ -1,5 +1,6 @@
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+// Same-origin by default: next.config.ts forwards /api/v1 to the backend. Set NEXT_PUBLIC_API_URL
+// to an absolute URL only to call a backend directly (that needs KAIROS_FRONTEND_ORIGIN for CORS).
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
 
 export type DataMode = "fixture" | "live";
 /** live: fetched now · cache: fresh snapshot reused · stale: fetch failed, last snapshot shown. */
@@ -139,7 +140,8 @@ export interface PersonCard {
   who: string;
   next_step: string;
   notes: Note[];
-  met: Note | null;
+  /** Set once a meeting note exists; the note text itself is in `notes`. */
+  met: { date: string } | null;
   triage: TriageDecision;
   warm_intro: string | null;
   reachability: string | null;
@@ -231,7 +233,8 @@ export class ApiError extends Error {
 type Query = Record<string, string | number | boolean | undefined | null>;
 
 function buildUrl(path: string, query?: Query): string {
-  const url = new URL(`${API_URL}${path}`);
+  const base = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const url = new URL(`${API_URL}${path}`, base);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value === undefined || value === null) continue;

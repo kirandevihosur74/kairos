@@ -178,7 +178,7 @@ function DraftReview({ draftId }: { draftId: string }) {
 
   const metSummary = (() => {
     if (person?.met) {
-      const timeStr = new Date(person.met.created_at).toLocaleTimeString([], {
+      const timeStr = new Date(person.met.date).toLocaleTimeString([], {
         hour: "numeric",
         minute: "2-digit",
       });

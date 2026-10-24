@@ -218,7 +218,7 @@ function PersonDeckCard({
   onInteresting,
 }: PersonDeckCardProps) {
   const subtitle = buildSubtitle(card.title, card.company);
-  const matchChipLabel = buildMatchChipLabel(card.why);
+  const matchChipLabel = buildMatchChipLabel(card);
   const whyChips = buildWhyChips(card.why);
   const sourceUrl = card.sources[0]?.url ?? null;
   const provenance = describeProvenance(card);
@@ -470,7 +470,8 @@ function buildSubtitle(
   return title ?? company ?? null;
 }
 
-function buildMatchChipLabel(why: WhyPath): string | null {
+function buildMatchChipLabel(card: PersonCard): string | null {
+  const why = card.why;
   // "Matched" topics are shared between the user side (User/Goal) and the
   // person side (Person). We count how many topic nodes are connected to a
   // person vs. how many are present in the graph.
@@ -486,7 +487,8 @@ function buildMatchChipLabel(why: WhyPath): string | null {
         (edge.to === topic.id && personIds.has(edge.from)),
     ),
   ).length;
-  const total = topicNodes.length;
+  // score = matched / number of profile interests, so recover the denominator from it.
+  const total = card.score > 0 ? Math.round(matched / card.score) : topicNodes.length;
   if (total === 0) return null;
   return `Matches ${matched} of ${total} interests`;
 }
