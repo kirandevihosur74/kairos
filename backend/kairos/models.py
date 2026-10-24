@@ -42,6 +42,14 @@ class ConferenceInput(Input):
     name: Text | None = None
     data_mode: Literal["fixture", "live"] = "fixture"
 
+    @field_validator("url", mode="before")
+    @classmethod
+    def assume_https(cls, value):
+        # People paste "meetup.com/x/events/1" from a phone; treat a bare domain as https.
+        if isinstance(value, str) and "://" not in value.strip():
+            return "https://" + value.strip()
+        return value
+
 
 class TriageInput(Input):
     conference_id: str

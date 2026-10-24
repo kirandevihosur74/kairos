@@ -244,3 +244,38 @@ def test_conferences_list_with_counts(client):
     assert items[other]["counts"] == {"interesting": 0, "met": 0, "drafts_pending": 0}
     assert items[cid]["people_found"] == len(people)
     assert {"name", "url", "stage", "created_at", "start_at", "end_at", "data_mode"} <= set(items[cid])
+
+
+def test_drafts_list_joins_person_and_filters(client):
+    cid, people = seed(client)
+    first, second = people[0], people[1]
+    client.post("/api/v1/met", json={"conference_id": cid, "person_id": first["id"], "note": "Talked about queues."})
+    follow = client.post(f"/api/v1/followups/{first['id']}/draft", json={"conference_id": cid}).json()
+    intro = client.post(
+        f"/api/v1/followups/{second['id']}/draft", json={"conference_id": cid, "kind": "introduction"}
+    ).json()
+    edit = {key: follow[key] for key in ("subject", "body", "linkedin_message")}
+    client.post(f"/api/v1/followups/{follow['id']}/approve", json=edit)
+
+    rows = client.get("/api/v1/drafts", params={"conference_id": cid}).json()
+    assert {r["id"] for r in rows} == {follow["id"], intro["id"]}
+    by_id = {r["id"]: r for r in rows}
+    assert by_id[follow["id"]]["status"] == "approved"
+    assert by_id[intro["id"]]["person"] == {
+        "id": second["id"],
+        "name": second["name"],
+        "title": second["title"],
+        "company": second["company"],
+        "photo_url": second["photo_url"],
+    }
+    pending = client.get("/api/v1/drafts", params={"conference_id": cid, "status": "draft"}).json()
+    assert [r["id"] for r in pending] == [intro["id"]]
+    assert client.get("/api/v1/drafts", params={"conference_id": "absent"}).status_code == 404
+    assert len(client.get("/api/v1/drafts").json()) == 2  # every event when no conference is given
+
+
+def test_event_url_without_scheme_is_accepted(client):
+    seed(client)
+    response = client.post("/api/v1/conference", json={"url": "example.invalid/event"})
+    assert response.status_code == 201, response.text
+    assert response.json()["url"] == "https://example.invalid/event"

@@ -295,6 +295,22 @@ def create_app(settings: Settings | None = None):
         value["draft_id"] = value["id"]
         return store().put("draft", value)
 
+    @app.get(api + "/drafts", dependencies=protected)
+    def list_drafts(conference_id: str | None = None, status: Literal["draft", "approved"] | None = None):
+        """Drafts newest first, each with the person it is for, so a queue renders in one request."""
+        s = store()
+        if conference_id is not None:
+            require(s, "conference", conference_id)
+        people = {p["id"]: p for p in s.all("person")}
+        rows = []
+        for d in s.all("draft"):
+            if (conference_id and d["conference_id"] != conference_id) or (status and d["status"] != status):
+                continue
+            p = people.get(d["person_id"], {})
+            fields = ("id", "name", "title", "company", "photo_url")
+            rows.append({**d, "person": {f: p.get(f) for f in fields}})
+        return sorted(rows, key=lambda d: (d["created_at"], d["id"]), reverse=True)
+
     @app.get(api + "/drafts/{did}", dependencies=protected)
     def get_draft(did: str):
         return require(store(), "draft", did)
