@@ -14,6 +14,7 @@ from pypdf.errors import PyPdfError
 from redis.exceptions import RedisError
 
 from .config import Settings
+from .ingest import canonical_url, load_event
 from .models import ConferenceInput, DraftEdit, DraftInput, NoteInput, Profile, TextImport, TriageInput
 from .service import cards, make_draft, now, person, profile, require, suggest, uid
 from .store import FalkorStore, SQLiteStore
@@ -95,7 +96,9 @@ def create_app(settings: Settings | None = None):
             "status": "ok",
             "storage": store().engine,
             "single_user_demo": True,
-            "ingestion": "fixture_only",
+            "ingestion": "fixture_and_luma"
+            if settings.brightdata_api_key and settings.brightdata_zone
+            else "fixture_only",
             "draft_generation": "template",
         }
 
@@ -153,29 +156,44 @@ def create_app(settings: Settings | None = None):
     @app.post(api + "/conference", status_code=201, dependencies=protected)
     def create_conference(body: ConferenceInput):
         profile(store())
+        live = body.data_mode == "live"
+        url = canonical_url(str(body.url)) if live else str(body.url)
         cid = uid("conference")
         conference = {
             "id": cid,
             "conference_id": cid,
-            "url": str(body.url),
-            "name": body.name,
+            "url": url,
+            "name": body.name or "Demo conference",
             "stage": "loading",
             "people_found": 0,
-            "data_mode": "fixture",
+            "data_mode": body.data_mode,
             "stale": False,
             "created_at": now(),
             "error": None,
         }
         store().put("conference", conference)
-        # URL is stored for context only. This route performs no external requests.
         try:
-            fixtures = json.loads(FIXTURE_PATH.read_text())
-            for fixture in fixtures:
-                value = {**fixture, "id": cid + ":" + fixture["id"], "conference_id": cid}
-                store().put("person", value)
-            conference.update(stage="ready", people_found=len(fixtures))
+            if live:
+                event, stale = load_event(url, settings, now())
+                people = event["people"]
+                conference.update(
+                    name=body.name or event["name"],
+                    stale=stale,
+                    collected_at=event["collected_at"],
+                    start_at=event["start_at"],
+                    city=event["city"],
+                )
+            else:
+                # Fixture mode stores the URL for context only and performs no external requests.
+                people = json.loads(FIXTURE_PATH.read_text())
+            for p in people:
+                store().put("person", {**p, "id": cid + ":" + p["id"], "conference_id": cid})
+            conference.update(stage="ready", people_found=len(people))
+        except HTTPException as exc:
+            store().put("conference", {**conference, "stage": "failed", "error": exc.detail})
+            raise
         except Exception:
-            store().put("conference", {**conference, "stage": "failed", "error": "Fixture loading failed"})
+            store().put("conference", {**conference, "stage": "failed", "error": "People loading failed"})
             raise
         store().put("conference", conference)
         return {**conference, "status_url": api + f"/conference/{cid}/status"}

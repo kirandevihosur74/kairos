@@ -12,3 +12,8 @@ class Settings(BaseSettings):
     graph_name: str = "kairos"
     frontend_origin: str = "http://localhost:3000"
     api_key: str = ""
+    brightdata_api_key: str = ""
+    brightdata_zone: str = ""
+    snapshot_dir: Path = Path("backend/data/snapshots")
+    snapshot_max_age_hours: float = 24
+    openai_api_key: str = ""

@@ -39,8 +39,8 @@ class TextImport(Input):
 
 class ConferenceInput(Input):
     url: HttpUrl
-    name: Text = "Demo conference"
-    data_mode: Literal["fixture"] = "fixture"
+    name: Text | None = None
+    data_mode: Literal["fixture", "live"] = "fixture"
 
 
 class TriageInput(Input):
