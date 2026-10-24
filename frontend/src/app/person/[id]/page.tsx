@@ -22,7 +22,9 @@ type LoadState = "loading" | "ready" | "error";
 
 function PersonPageRoute() {
   const params = useParams<{ id: string }>();
-  const id = params?.id;
+  // Route params arrive URL-encoded ("conference_x%3Aperson"); decode so the id is not encoded twice
+  // when it is stored for the mic button and put back into a URL.
+  const id = params?.id ? decodeURIComponent(params.id) : undefined;
   if (!id) return null;
   return (
     <RequireProfile>
@@ -180,7 +182,8 @@ function PersonPageInner({ id }: { id: string }) {
 
         <NotesHistory notes={person.notes} />
 
-        <div className="flex flex-col gap-3 pt-2">
+        {/* Sticky above the floating bottom nav, which otherwise covers these buttons. */}
+        <div className="sticky bottom-[92px] z-20 flex flex-col gap-3 bg-paper/95 pb-2 pt-2 backdrop-blur">
           <Link href={`/person/${encodeURIComponent(person.id)}/note`} className="w-full">
             <Button variant="primary" size="lg" fullWidth>
               Capture a note

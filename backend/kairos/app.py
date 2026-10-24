@@ -148,9 +148,14 @@ def create_app(settings: Settings | None = None):
     @app.post(api + "/onboarding", dependencies=protected)
     @app.put(api + "/profile", dependencies=protected)
     def save_profile(body: Profile):
-        imported = require(store(), "import", body.import_id) if body.import_id else None
+        imported = store().get("import", body.import_id) if body.import_id else None
+        if body.import_id and not imported:
+            # The import only records where suggestions came from. A stale one (e.g. from before a data
+            # reset) must not block saving the profile the user reviewed: drop the link and save.
+            logs.event("profile.import_missing", logging.WARNING, import_id=body.import_id)
         value = {
             **body.model_dump(mode="json"),
+            "import_id": imported["id"] if imported else None,
             "id": "demo_user",
             "user_id": "demo_user",
             "confirmed_at": now(),

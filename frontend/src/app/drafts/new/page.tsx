@@ -266,7 +266,8 @@ function NewDraft() {
           <p className="pt-3 text-[13px] text-alert">{submitError}</p>
         ) : null}
 
-        <div className="mt-auto pb-6 pt-6">
+        {/* Sticky above the floating bottom nav. */}
+        <div className="sticky bottom-[92px] z-20 mt-auto bg-paper/95 pb-3 pt-3 backdrop-blur">
           <Button
             variant="primary"
             size="lg"

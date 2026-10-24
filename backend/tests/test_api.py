@@ -110,7 +110,9 @@ def test_import_requires_confirmation(client):
     assert preview["suggested_profile"]["skills"] == ["python", "postgresql"]
     assert client.get("/api/v1/profile").status_code == 409
     assert client.post("/api/v1/onboarding", json={**PROFILE, "import_id": preview["id"]}).status_code == 200
-    assert client.post("/api/v1/onboarding", json={**PROFILE, "import_id": "missing"}).status_code == 404
+    # A stale import (e.g. from before a data reset) never blocks saving the reviewed profile.
+    stale = client.post("/api/v1/onboarding", json={**PROFILE, "import_id": "missing"})
+    assert stale.status_code == 200 and stale.json()["import_id"] is None
 
 
 def test_resume_validation(client):

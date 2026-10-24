@@ -317,8 +317,8 @@ function DraftReview({ draftId }: { draftId: string }) {
         <div className="h-4" />
       </div>
 
-      {/* Bottom action bar */}
-      <div className="mt-auto border-t border-line bg-card px-5 pb-4 pt-3">
+      {/* Bottom action bar: sticky above the floating bottom nav so Approve is always reachable. */}
+      <div className="sticky bottom-[92px] z-20 mt-auto border-t border-line bg-card px-5 pb-4 pt-3">
         <div className="flex gap-2.5">
           {editing ? (
             <>

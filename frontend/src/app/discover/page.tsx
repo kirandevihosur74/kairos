@@ -319,8 +319,8 @@ function PersonDeckCard({
         </div>
       </Card>
 
-      {/* Actions */}
-      <div className="mt-6 flex items-center gap-3">
+      {/* Actions: sticky so the floating bottom nav never covers them on short phone screens. */}
+      <div className="sticky bottom-[92px] z-20 mt-6 flex items-center gap-3 bg-paper/95 py-2 backdrop-blur">
         <Button
           variant="secondary"
           size="lg"
