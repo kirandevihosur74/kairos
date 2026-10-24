@@ -1,7 +1,10 @@
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
-export type DataMode = "fixture";
+export type DataMode = "fixture" | "live";
+/** live: fetched now · cache: fresh snapshot reused · stale: fetch failed, last snapshot shown. */
+export type Freshness = "live" | "cache" | "stale";
+export type PersonSource = "fixture" | "luma" | "web";
 export type ProfileSource = "manual" | "assistant_summary" | "resume_text" | "resume_pdf";
 export type TriageDecision = "interesting" | "not_interesting" | null;
 export type DraftKind = "introduction" | "follow_up" | "referral";
@@ -51,9 +54,34 @@ export interface Conference {
   people_found: number;
   data_mode: DataMode;
   stale: boolean;
+  /** Null for fixture events. */
+  freshness: Freshness | null;
+  source: "luma" | "web" | null;
   created_at: string;
   error: string | null;
   status_url: string;
+  /** Live events only. */
+  collected_at?: string;
+  start_at?: string | null;
+  end_at?: string | null;
+  city?: string | null;
+}
+
+/** One row of GET /conferences ("Your events"). Dates are null for fixture events. */
+export interface ConferenceSummary {
+  conference_id: string;
+  name: string | null;
+  url: string;
+  stage: ConferenceStage;
+  created_at: string;
+  start_at: string | null;
+  end_at: string | null;
+  data_mode: DataMode;
+  stale: boolean;
+  freshness: Freshness | null;
+  source: "luma" | "web" | null;
+  people_found: number;
+  counts: { interesting: number; met: number; drafts_pending: number };
 }
 
 export interface SourceRef {
@@ -95,8 +123,13 @@ export interface PersonCard {
   company: string | null;
   topics: string[];
   photo_url: string | null;
-  source: "fixture";
+  source: PersonSource;
   data_mode: DataMode;
+  /** Live people only: how the event page presents them (speaker, judge, host, ...). */
+  event_role?: string;
+  /** Web-extracted people only. */
+  site?: string;
+  extraction?: "ai";
   match_confidence: MatchConfidence;
   stale: boolean;
   sources: SourceRef[];
@@ -134,10 +167,33 @@ export interface Draft {
   linkedin_message: string;
   grounded_on: Grounding[];
   status: DraftStatus;
-  generation_mode: "template";
+  generation_mode: "template" | "ai";
+  model: string | null;
+  /** Set when AI drafting failed and a template was shown instead. */
+  generation_note: string | null;
   data_mode: DataMode;
   created_at: string;
   approved_at: string | null;
+}
+
+export interface DraftRow extends Draft {
+  person: {
+    id: string;
+    name: string | null;
+    title: string | null;
+    company: string | null;
+    photo_url: string | null;
+  };
+}
+
+export interface VoiceTranscript {
+  text: string;
+  model: string;
+  conference_id: string | null;
+  person_id: string | null;
+  /** People named in the note; only filled when no person_id was sent. */
+  person_candidates: DraftRow["person"][];
+  saved: false;
 }
 
 export interface HealthStatus {
@@ -145,7 +201,9 @@ export interface HealthStatus {
   storage: string;
   single_user_demo: boolean;
   ingestion: string;
+  live_sources: ("luma" | "any_public_page")[];
   draft_generation: string;
+  voice_transcription: string | null;
 }
 
 export interface TriageResult {
@@ -192,7 +250,8 @@ async function request<T>(
     ...rest,
     headers: {
       Accept: "application/json",
-      ...(rest.body ? { "Content-Type": "application/json" } : {}),
+      // JSON bodies only: FormData uploads need the browser's multipart boundary header.
+      ...(typeof rest.body === "string" ? { "Content-Type": "application/json" } : {}),
       ...headers,
     },
   });
@@ -244,11 +303,15 @@ export const api = {
     });
   },
 
-  createConference: (url: string, name?: string) =>
+  // The first load of a large event page can take about a minute (fetch + AI extraction).
+  createConference: (url: string, name?: string, dataMode: DataMode = "live") =>
     request<Conference>("/conference", {
       method: "POST",
-      body: JSON.stringify({ url, name, data_mode: "fixture" as DataMode }),
+      body: JSON.stringify({ url, name, data_mode: dataMode }),
+      signal: AbortSignal.timeout(150_000),
     }),
+
+  listConferences: () => request<ConferenceSummary[]>("/conferences"),
 
   getConferenceStatus: (conferenceId: string) =>
     request<Conference>(`/conference/${conferenceId}/status`),
@@ -310,7 +373,26 @@ export const api = {
       }),
     }),
 
+  listDrafts: (conferenceId?: string, status?: DraftStatus) =>
+    request<DraftRow[]>("/drafts", {
+      query: { conference_id: conferenceId, status },
+    }),
+
   getDraft: (draftId: string) => request<Draft>(`/drafts/${draftId}`),
+
+  /** Speech-to-text only; nothing is saved. Submit the reviewed text with saveMetNote. */
+  transcribeVoice: (audio: Blob, conferenceId?: string, personId?: string) => {
+    const form = new FormData();
+    const ext = audio.type.includes("mp4") ? "mp4" : audio.type.includes("ogg") ? "ogg" : "webm";
+    form.append("file", audio, `note.${ext}`);
+    if (conferenceId) form.append("conference_id", conferenceId);
+    if (personId) form.append("person_id", personId);
+    return request<VoiceTranscript>("/voice/transcribe", {
+      method: "POST",
+      body: form,
+      headers: { Accept: "application/json" },
+    });
+  },
 
   updateDraft: (
     draftId: string,

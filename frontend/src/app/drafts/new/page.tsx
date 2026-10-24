@@ -18,24 +18,6 @@ import {
 } from "@/lib/api";
 import { useSession } from "@/lib/session";
 
-const QUEUE_STORAGE_KEY = "kairos.drafts";
-
-function pushToQueue(id: string) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = window.localStorage.getItem(QUEUE_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    const existing = Array.isArray(parsed)
-      ? parsed.filter((v): v is string => typeof v === "string")
-      : [];
-    if (existing.includes(id)) return;
-    existing.push(id);
-    window.localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(existing));
-  } catch {
-    // Ignore quota errors.
-  }
-}
-
 type Step = "choose" | "referral";
 
 interface Option {
@@ -130,7 +112,6 @@ function NewDraft() {
         kind === "referral" ? jobUrl.trim() : undefined,
         kind === "referral" ? jobDescription.trim() : undefined,
       );
-      pushToQueue(draft.id);
       router.replace(`/drafts/${draft.id}`);
     } catch (err) {
       setSubmitError(

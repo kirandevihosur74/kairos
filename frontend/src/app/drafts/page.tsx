@@ -12,30 +12,6 @@ import {
 import { ApiError, api, type Draft, type DraftKind, type DraftStatus } from "@/lib/api";
 import { useSession } from "@/lib/session";
 
-const QUEUE_STORAGE_KEY = "kairos.drafts";
-
-function readQueue(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(QUEUE_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((v): v is string => typeof v === "string");
-  } catch {
-    return [];
-  }
-}
-
-function writeQueue(ids: string[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(ids));
-  } catch {
-    // Ignore quota errors.
-  }
-}
-
 interface Row {
   draft: Draft;
   personName: string;
@@ -86,57 +62,26 @@ function DraftsQueue() {
     let cancelled = false;
 
     (async () => {
-      const ids = readQueue();
-      if (ids.length === 0) {
-        if (!cancelled) {
-          setRows([]);
-          setLoading(false);
-          setError(null);
-        }
-        return;
-      }
-
-      const results: Row[] = [];
-      const keep: string[] = [];
       try {
-        for (const id of ids) {
-          try {
-            const draft = await api.getDraft(id);
-            keep.push(id);
-            let personName = "Someone";
-            let personTitle: string | null = null;
-            let photoUrl: string | null = null;
-            try {
-              const person = await api.getPerson(draft.person_id, conferenceId);
-              personName = person.name;
-              personTitle = person.title ?? person.company ?? null;
-              photoUrl = person.photo_url ?? null;
-            } catch {
-              // leave fallback name/title.
-            }
-            results.push({ draft, personName, personTitle, photoUrl });
-          } catch (err) {
-            if (err instanceof ApiError && err.status === 404) {
-              // Drop missing drafts from the queue.
-              continue;
-            }
-            // On transient errors, keep the id so we try again next load.
-            keep.push(id);
-          }
-        }
+        // One request: drafts for this event, newest first, each with its person.
+        const drafts = await api.listDrafts(conferenceId);
         if (cancelled) return;
-        if (keep.length !== ids.length) writeQueue(keep);
-        // Most recent drafts first — queue is append order; reverse it.
-        results.reverse();
-        setRows(results);
+        setRows(
+          drafts.map((draft) => ({
+            draft,
+            personName: draft.person.name ?? "Someone",
+            personTitle: draft.person.title ?? draft.person.company ?? null,
+            photoUrl: draft.person.photo_url ?? null,
+          })),
+        );
         setError(null);
-        setLoading(false);
       } catch (err) {
         if (cancelled) return;
         setError(
           err instanceof ApiError ? describeError(err) : "Could not load drafts.",
         );
-        setLoading(false);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
 

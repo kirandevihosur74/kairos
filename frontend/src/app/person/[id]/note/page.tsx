@@ -10,6 +10,7 @@ import {
   RequireProfile,
   SectionLabel,
   useToast,
+  VoiceRecorder,
 } from "@/components";
 import { ApiError, api, type PersonCard } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -181,6 +182,15 @@ function NoteCaptureInner({ id }: { id: string }) {
           <p className="text-[12px] text-muted">
             Notes are append-only and saved to {firstName(person.name)}&rsquo;s memory in your graph.
           </p>
+          {/* Dictation fills the box for review; nothing is saved until "Save note". */}
+          <VoiceRecorder
+            conferenceId={conferenceId}
+            personId={person.id}
+            disabled={saving}
+            onTranscript={(spoken) =>
+              setText((current) => (current.trim() ? `${current.trim()}\n${spoken}` : spoken))
+            }
+          />
         </div>
 
         {error ? <p className="text-[13px] text-alert">{error}</p> : null}

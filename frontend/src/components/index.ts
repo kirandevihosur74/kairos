@@ -15,3 +15,5 @@ export { RequireProfile } from "./RequireProfile";
 export { SectionLabel } from "./SectionLabel";
 export type { SectionLabelProps } from "./SectionLabel";
 export { ToastProvider, useToast } from "./Toast";
+export { VoiceRecorder } from "./VoiceRecorder";
+export type { VoiceRecorderProps } from "./VoiceRecorder";

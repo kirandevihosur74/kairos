@@ -62,6 +62,7 @@ export default function AddEventPage() {
       const conference = await api.createConference(
         url.trim(),
         name.trim() || undefined,
+        "live",
       );
       setConferenceId(conference.id);
       router.push("/discover");
@@ -132,6 +133,16 @@ export default function AddEventPage() {
           </p>
         </div>
 
+        {submitting ? (
+          <div
+            role="status"
+            className="rounded-[12px] border border-line bg-card px-3 py-2 text-[13px] text-muted"
+          >
+            Reading the event page and finding speakers, judges and hosts. A
+            big page can take up to a minute the first time.
+          </div>
+        ) : null}
+
         {error ? (
           <div className="rounded-[12px] border border-alert/40 bg-alert/5 px-3 py-2 text-[13px] text-alert">
             {error}
@@ -147,7 +158,7 @@ export default function AddEventPage() {
             disabled={!canSubmit}
             trailing={<span aria-hidden>→</span>}
           >
-            {submitting ? "Adding…" : "Start sorting"}
+            {submitting ? "Finding people…" : "Start sorting"}
           </Button>
         </div>
       </form>

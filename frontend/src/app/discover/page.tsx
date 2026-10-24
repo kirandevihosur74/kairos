@@ -221,6 +221,7 @@ function PersonDeckCard({
   const matchChipLabel = buildMatchChipLabel(card.why);
   const whyChips = buildWhyChips(card.why);
   const sourceUrl = card.sources[0]?.url ?? null;
+  const provenance = describeProvenance(card);
 
   return (
     <div className="flex flex-1 flex-col px-5 pb-6">
@@ -247,7 +248,7 @@ function PersonDeckCard({
         {/* Header strip */}
         <div className="relative h-[170px] bg-subtle">
           <div className="absolute left-3 top-3">
-            <Chip tone="outline">Sample data</Chip>
+            <Chip tone="outline">{provenance.chip}</Chip>
           </div>
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <Avatar name={card.name} src={card.photo_url} size="ring" />
@@ -300,7 +301,7 @@ function PersonDeckCard({
 
           {sourceUrl ? (
             <p className="pt-1 text-[12px] text-faint">
-              Source: {sourceUrl} · fixture, not live
+              Source: {sourceUrl} · {provenance.detail}
             </p>
           ) : null}
         </div>
@@ -519,4 +520,22 @@ function buildWhyChips(why: WhyPath): WhyChip[] {
       tone,
     };
   });
+}
+
+// Fixture people are fictional; live people come from the event page, possibly via an older snapshot.
+function describeProvenance(card: PersonCard): { chip: string; detail: string } {
+  if (card.data_mode === "fixture") {
+    return { chip: "Sample data", detail: "fixture, not live" };
+  }
+  const collected = card.sources[0]?.collected_at;
+  const when = collected
+    ? new Date(collected).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    : null;
+  const role = card.event_role
+    ? card.event_role.charAt(0).toUpperCase() + card.event_role.slice(1)
+    : "Listed on event page";
+  if (card.stale) {
+    return { chip: role, detail: `saved snapshot${when ? ` from ${when}` : ""}, live fetch failed` };
+  }
+  return { chip: role, detail: `from the event page${when ? `, ${when}` : ""}` };
 }
