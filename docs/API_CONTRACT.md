@@ -6,7 +6,7 @@ Implemented base URL: `http://127.0.0.1:8000/api/v1`. Interactive documentation:
 
 1. Optionally POST `/onboarding/import-text` or `/onboarding/resume` to obtain suggested fields and an `import_id`.
 2. Show editable fields and POST the reviewed profile to `/onboarding`. Imports do not update the profile until this call.
-3. POST `/conference` with `url`, optional `name`, and `data_mode`. `fixture` (default) loads fictional sample people and never fetches the URL. `live` fetches one public Luma event page (`https://luma.com/<event>`) through Bright Data and loads its listed judges and hosts.
+3. POST `/conference` with `url`, optional `name`, and `data_mode`. `fixture` (default) loads fictional sample people and never fetches the URL. `live` fetches any public event page through Bright Data. Luma pages (`https://luma.com/<event>`) use an exact parser for judges and hosts. Any other public page (Meetup, Partiful, Eventbrite, a conference speakers page) uses AI extraction (requires `KAIROS_OPENAI_API_KEY`): only people the page presents as speaker, judge, host, organizer, panelist, mentor or moderator are kept, every name must appear verbatim on the page, and titles/companies the page does not state are left blank. Guest/attendee lists are never ingested. IP addresses, localhost and internal hostnames are rejected with 422.
 4. GET `/people?conference_id=...`, then save `/triage` and `/met` changes.
 5. POST `/followups/{person_id}/draft`, edit, and approve for copying.
 
@@ -22,7 +22,7 @@ Implemented base URL: `http://127.0.0.1:8000/api/v1`. Interactive documentation:
 | PUT /profile | Complete reviewed profile | Replaces profile and updates ranking interests |
 | POST /onboarding/import-text | source, text | import_id, suggested_profile, requires_review |
 | POST /onboarding/resume | Multipart file | Same preview; text-based PDF only |
-| POST /conference | url, name?, data_mode: fixture or live | 201: conference_id, stage, people_found, data_mode, stale, status_url (live also: collected_at, start_at, city) |
+| POST /conference | url, name?, data_mode: fixture or live | 201: conference_id, stage, people_found, data_mode, stale, freshness, source, status_url (live also: collected_at, start_at, end_at, city) |
 | GET /conference/{id}/status | — | Persisted conference status |
 | GET /conferences | — | All of the user's events, newest first: conference_id, name, url, stage, created_at, start_at, end_at, data_mode, stale, people_found, counts {interesting, met, drafts_pending} |
 | GET /people | conference_id, triage? | Ranked card array |
@@ -59,7 +59,7 @@ Name, target_roles, and interests are required. Interests and skills are lowerca
 
 Score = distinct matching interests / selected interests, in [0,1]. Ties sort by ID. It is not a hiring probability, referral likelihood, or evidence that the person's company is hiring. Why-path edges correspond to matching topics; in FalkorDB mode those topics come from the multi-hop graph query.
 
-Triage decisions: interesting, not_interesting, null (reset). Default discovery excludes not_interesting. Explicit filters: interesting, not_interesting, all. Fixture cards have data_mode: fixture, source: fixture, and fictional example.invalid sources with null collection dates. Live cards have data_mode: live, source: luma, event_role (judge or host), the event page as their source with its real collected_at, and stale: true when served from a snapshot after a failed fetch. Live topics come from a fixed canonical vocabulary matched against each person's role text, so pick profile interests from that vocabulary (for example ai, agents, backend, infrastructure, distributed systems, data engineering, software engineering, startups). Unknown photos, fun facts, reachability, and warm intros are null. Render initials for missing photos. Do not imply these sample people attend the supplied event.
+Triage decisions: interesting, not_interesting, null (reset). Default discovery excludes not_interesting. Explicit filters: interesting, not_interesting, all. Fixture cards have data_mode: fixture, source: fixture, and fictional example.invalid sources with null collection dates. Live cards have data_mode: live, source: luma or web (web cards also have site and extraction: ai), event_role, the event page as their source with its real collected_at, and stale: true when served from a snapshot after a failed fetch. Live topics come from a fixed canonical vocabulary matched against each person's role text, so pick profile interests from that vocabulary (for example ai, agents, backend, infrastructure, distributed systems, data engineering, software engineering, startups). Unknown photos, fun facts, reachability, and warm intros are null. Render initials for missing photos. Do not imply these sample people attend the supplied event.
 
 `notes` preserves all entries in timestamp order. `met` indicates a saved meeting note. Adding notes represents the user's account of the conversation. Nothing infers a meeting from a shortlist decision.
 
@@ -77,9 +77,9 @@ Triage decisions: interesting, not_interesting, null (reset). Default discovery 
 
 ## Operational boundaries
 
-Fixture loading is synchronous and returns 201 with stage ready, not the earlier proposed 202 asynchronous scrape. A failed/interrupted load marks the conference failed; cards are unavailable for it. Live loading is also synchronous. Each successful fetch is snapshotted per event and reused for `KAIROS_SNAPSHOT_MAX_AGE_HOURS` (default 24). If a fetch fails, the last snapshot is used and marked stale; with no snapshot the request fails with 502. Live mode never falls back to fixtures.
+Fixture loading is synchronous and returns 201 with stage ready, not the earlier proposed 202 asynchronous scrape. A failed/interrupted load marks the conference failed; cards are unavailable for it. Live loading is also synchronous. Each successful fetch is snapshotted per event and reused for `KAIROS_SNAPSHOT_MAX_AGE_HOURS` (default 24). If a fetch fails, the last snapshot is used and marked stale; with no snapshot the request fails with 502. Live mode never falls back to fixtures. Conference `freshness` is `live` (fetched now), `cache` (fresh snapshot reused, no fetch) or `stale` (fetch failed, last snapshot served). A first load of a large non-Luma page can take up to about a minute while the AI reads it, so give POST /conference a long client timeout and show a loading state; repeat loads are instant from cache. `GET /health` reports `live_sources`: `["luma"]` with Bright Data only, `["luma", "any_public_page"]` when OpenAI is also configured.
 
-422: invalid input, missing job data, or an unsupported live URL; 404: unknown or cross-conference IDs; 409: missing onboarding/note or not-ready conference; 413: oversized upload; 401: missing/wrong configured API key; 502: live event fetch failed with no snapshot, or explicit AI drafting failed; 503: graph connection errors or AI drafting requested but not configured. Error bodies use `detail`.
+422: invalid input, missing job data, or a non-public live URL; 404: unknown or cross-conference IDs; 409: missing onboarding/note or not-ready conference; 413: oversized upload; 401: missing/wrong configured API key; 502: live event fetch failed with no snapshot, or explicit AI drafting failed; 503: graph connection errors, AI drafting requested but not configured, or a non-Luma live page without OpenAI configured. Error bodies use `detail`.
 
 Local demo only: CORS is configured for one exact frontend origin; it is not authentication. Optional X-API-Key is a shared team credential. Multi-user sessions, per-user authorization, deletion/export controls, and hardened document parsing are prerequisites to public deployment.
 

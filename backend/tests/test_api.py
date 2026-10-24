@@ -138,9 +138,16 @@ def test_invalid_input_and_no_unimplemented_live_claim(client):
     assert client.post("/api/v1/onboarding", json={**PROFILE, "interests": []}).status_code == 422
     assert client.post("/api/v1/onboarding", json={**PROFILE, "name": "   "}).status_code == 422
     seed(client)
+    # Without extraction configured, a non-Luma live page is refused, never simulated.
     assert (
         client.post(
             "/api/v1/conference", json={"url": "https://example.com", "data_mode": "live"}
+        ).status_code
+        == 503
+    )
+    assert (
+        client.post(
+            "/api/v1/conference", json={"url": "http://127.0.0.1:8000/admin", "data_mode": "live"}
         ).status_code
         == 422
     )

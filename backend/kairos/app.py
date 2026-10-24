@@ -15,7 +15,7 @@ from pypdf.errors import PyPdfError
 from redis.exceptions import RedisError
 
 from .config import Settings
-from .ingest import canonical_url, load_event
+from .ingest import canonical_url, is_luma, load_event
 from .models import ConferenceInput, DraftEdit, DraftInput, NoteInput, Profile, TextImport, TriageInput
 from .service import cards, make_draft, now, person, profile, require, suggest, uid
 from .store import FalkorStore, SQLiteStore
@@ -100,6 +100,10 @@ def create_app(settings: Settings | None = None):
             "ingestion": "fixture_and_luma"
             if settings.brightdata_api_key and settings.brightdata_zone
             else "fixture_only",
+            # Luma pages need Bright Data; any other public event page also needs OpenAI for extraction.
+            "live_sources": (["luma"] + (["any_public_page"] if settings.openai_api_key else []))
+            if settings.brightdata_api_key and settings.brightdata_zone
+            else [],
             "draft_generation": "openai" if settings.openai_api_key else "template",
         }
 
@@ -169,17 +173,21 @@ def create_app(settings: Settings | None = None):
             "people_found": 0,
             "data_mode": body.data_mode,
             "stale": False,
+            "freshness": None,
+            "source": None,
             "created_at": now(),
             "error": None,
         }
         store().put("conference", conference)
         try:
             if live:
-                event, stale = load_event(url, settings, now())
+                event, freshness = load_event(url, settings, now())
                 people = event["people"]
                 conference.update(
                     name=body.name or event["name"],
-                    stale=stale,
+                    stale=freshness == "stale",
+                    freshness=freshness,
+                    source="luma" if is_luma(url) else "web",
                     collected_at=event["collected_at"],
                     start_at=event["start_at"],
                     end_at=event["end_at"],
@@ -228,6 +236,8 @@ def create_app(settings: Settings | None = None):
                 "end_at": c.get("end_at"),
                 "data_mode": c["data_mode"],
                 "stale": c["stale"],
+                "freshness": c.get("freshness"),
+                "source": c.get("source"),
                 "people_found": c["people_found"],
                 "counts": {
                     "interesting": interesting[c["id"]],
