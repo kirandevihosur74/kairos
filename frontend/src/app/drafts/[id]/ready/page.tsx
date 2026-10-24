@@ -172,6 +172,23 @@ function Ready({ draftId }: { draftId: string }) {
               onClick={() => void copy("linkedin")}
             />
           </div>
+          {/* Opens a prefilled compose window; the user adds the recipient and sends. Kairos never sends. */}
+          <div className="mt-1 flex gap-2">
+            <a
+              href={gmailComposeUrl(draft)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-ink px-3 py-2 text-[13px] font-medium text-white"
+            >
+              Open in Gmail
+            </a>
+            <a
+              href={mailtoUrl(draft)}
+              className="inline-flex items-center justify-center rounded-full border border-line bg-card px-3 py-2 text-[13px] font-medium text-ink"
+            >
+              Mail app
+            </a>
+          </div>
         </div>
 
         <p className="text-[12px] text-faint">
@@ -264,6 +281,18 @@ function ReadyGlyph() {
       </svg>
     </div>
   );
+}
+
+// Gmail's documented compose link: opens Gmail (web, or the app on phones that hand it over) with the
+// subject and body filled in and the To field empty, since Kairos does not know people's addresses.
+function gmailComposeUrl(draft: Draft): string {
+  const params = new URLSearchParams({ view: "cm", fs: "1", su: draft.subject.trim(), body: draft.body });
+  return `https://mail.google.com/mail/?${params.toString()}`;
+}
+
+// Fallback for any mail app (Apple Mail, Outlook, the Gmail app as default handler).
+function mailtoUrl(draft: Draft): string {
+  return `mailto:?subject=${encodeURIComponent(draft.subject.trim())}&body=${encodeURIComponent(draft.body)}`;
 }
 
 function formatEmail(draft: Draft): string {
