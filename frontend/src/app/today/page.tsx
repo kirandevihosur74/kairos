@@ -1,5 +1,7 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -30,7 +32,7 @@ function Today({ profile }: { profile: Profile }) {
   const first = data?.people.find((p) => !p.met) ?? data?.people[0];
 
   return <PhoneShell><div className="flex flex-1 flex-col gap-4 px-4 pt-1 pb-6">
-    <header className="flex items-center justify-between"><Link href="/events" className="font-serif text-[25px]" aria-label="Kairos · your events">kairos</Link><div className="flex items-center gap-3"><Link href="/events" className="text-xs text-muted">Your events</Link><Link href="/profile" aria-label="Edit profile"><Avatar name={profile.name} size="md" /></Link></div></header>
+    <header className="flex items-center justify-between"><Link href="/events" className="font-serif text-[25px]" aria-label="Kairos · your events"><Logo /></Link><div className="flex items-center gap-3"><Link href="/events" className="text-xs text-muted">Your events</Link><Link href="/profile" aria-label="Edit profile"><Avatar name={profile.name} size="md" /></Link></div></header>
     {error ? <LoadMessage error={error} onRetry={() => setRetry((n) => n + 1)} /> : !data ? <LoadMessage loading /> : <>
       <Link href="/events" className="rounded-xl bg-ink p-4 text-white"><span className="inline-block rounded-full bg-white/15 px-2.5 py-1 text-[10px]">{data.conference.data_mode === "fixture" ? "Sample event" : eventPhase(data.conference, now) === "now" ? "Live now" : data.conference.stale ? "Saved snapshot" : "Your event"}</span><h1 className="mt-2 font-serif text-[26px] leading-tight">{data.conference.name || "Your event"}</h1><p className="mt-1 text-[13px] text-white/75">{[data.conference.city, eventDate(data.conference), `${data.people.length} shortlisted`].filter(Boolean).join(" · ")}</p></Link>
       {first && <section><h2 className="mb-3 text-[14px]">Up next</h2><button onClick={() => open(first)} className="flex w-full items-center gap-3 rounded-xl bg-cream p-4 text-left"><Avatar name={first.name} src={first.photo_url} size="lg" className="shrink-0 rounded-xl" /><span><span className="block text-[14px]">{first.name}</span><span className="mt-1 block text-xs leading-relaxed text-muted">{first.notes.at(-1)?.text || first.next_step}</span></span></button></section>}

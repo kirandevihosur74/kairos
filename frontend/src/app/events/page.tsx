@@ -1,5 +1,7 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -29,7 +31,7 @@ function Events({ profile }: { profile: Profile }) {
   }
 
   return <PhoneShell><div className="flex flex-1 flex-col gap-5 px-5 pt-1 pb-6">
-    <header className="flex items-center justify-between"><span className="font-serif text-2xl">kairos</span><Link href="/profile" aria-label="Edit your profile"><Avatar name={profile.name} size="md" /></Link></header>
+    <header className="flex items-center justify-between"><Logo /><Link href="/profile" aria-label="Edit your profile"><Avatar name={profile.name} size="md" /></Link></header>
     <div><h1 className="font-serif text-4xl">Your events</h1><p className="mt-1 text-[14px] leading-relaxed text-muted">One profile, every conference. What you learn carries over.</p></div>
     {error ? <LoadMessage error={error} onRetry={() => setRetry((n) => n + 1)} /> : !events ? <LoadMessage loading /> : !events.length ? <div className="rounded-xl border border-dashed border-line p-6"><h2 className="font-serif text-2xl">Your next room starts here.</h2><p className="mt-2 text-sm text-muted">Add an event link to find people worth meeting.</p></div> : ([['now', 'Happening now'], ['upcoming', 'Coming up'], ['undated', 'Your events'], ['past', 'Past']] as const).map(([phase, label]) => {
       const group = events.filter((event) => eventPhase(event, now) === phase);

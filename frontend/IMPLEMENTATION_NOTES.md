@@ -22,7 +22,7 @@ Discovery: 219:1228. Lead sheet: 242:1173. Today: 219:1434. Events: 221:1192. Pr
 
 ## Backend limits / remaining assets
 
-- The requested replacement logo could not be accessed: its attachment was missing. Existing wordmarks remain.
+- The supplied blue graph / navy Kairos logo is stored locally and reused across the app wordmarks. The mock device status bar is removed.
 - No APIs exist for connections CSV ingestion, LinkedIn sync, warm-intro traversal, semantic graph questions, notifications, data deletion, or undoing notes. These features were not simulated.
 - The current backend returns empty openers/talks/signals and null fun facts/reachability. The UI uses these fields if supplied and otherwise uses the backend next step; it does not invent enrichment.
 - Loading percentage and per-source ingestion counters are not exposed. Event creation retains its real request/loading/error flow.

@@ -1,5 +1,7 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -82,15 +84,7 @@ function AddEventForm() {
         className="flex flex-1 flex-col gap-6 px-5 pb-10 pt-3"
       >
         <div className="flex items-center justify-between"><Link href="/events" className="text-sm text-alert">‹ Your events</Link><span className="text-xs text-muted">Add an event</span></div>
-        <div className="flex items-center gap-2">
-          <span
-            aria-hidden
-            className="inline-block h-[18px] w-[18px] rounded-full border-[1.5px] border-ink"
-          />
-          <p className="font-serif text-[23px] leading-none tracking-[-0.01em] text-ink">
-            kairos
-          </p>
-        </div>
+        <Logo />
 
         <h1 className="font-serif text-[32px] leading-[1.05] tracking-[-0.01em] text-ink">
           Where are you going next?

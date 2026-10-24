@@ -16,7 +16,7 @@ PR #10 is the active backend-compatible implementation against `main`. The earli
 - Glance brief and note-capture bottom-sheet presentation.
 - Interest-edit bottom sheet and explicit re-ranked screen.
 - Remaining onboarding and follow-up presentation details from the archived prototypes.
-- Replacement logo, once the missing attachment is supplied.
+- Replacement logo completed in a follow-up using the supplied artwork.
 - Unsupported network import, source-specific progress, graph Q&A, hiding across events, data deletion and notifications require separate backend work.
 
 Use `main` as the base for future focused implementation PRs. Port visual pieces selectively; do not merge the prototype branches wholesale. Reopen an archived PR if its work is resumed, or use its preserved source commit in a new PR.

@@ -1,5 +1,7 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
+
 import { useRouter } from "next/navigation";
 import { useRef, useState, type ChangeEvent } from "react";
 import { Button, PhoneShell, SectionLabel } from "@/components";
@@ -83,7 +85,7 @@ export default function OnboardingImportPage() {
     <PhoneShell withNavSpacer={false}>
       <div className="flex flex-1 flex-col gap-6 px-5 pb-10 pt-2">
         <div className="flex items-start justify-between gap-3 pt-1">
-          <p className="font-serif text-[24px] leading-none text-ink">kairos</p>
+          <Logo />
           <p className="pt-2 text-[13px] text-muted">Step 1 of 3</p>
         </div>
 

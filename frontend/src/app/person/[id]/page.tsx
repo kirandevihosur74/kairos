@@ -1,5 +1,7 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
+
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -210,9 +212,7 @@ function TopBar({ onBack }: { onBack: () => void }) {
       >
         ‹ Shortlist
       </button>
-      <span className="font-serif text-[18px] tracking-[-0.01em] text-ink">
-        kairos
-      </span>
+      <Logo width={100} />
     </div>
   );
 }

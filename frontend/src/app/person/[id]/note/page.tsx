@@ -1,5 +1,7 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
+
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
@@ -152,9 +154,7 @@ function NoteCaptureInner({ id }: { id: string }) {
           >
             ‹ Back
           </button>
-          <span className="font-serif text-[18px] tracking-[-0.01em] text-ink">
-            kairos
-          </span>
+          <Logo width={100} />
         </div>
 
         <div className="flex items-center gap-3">
