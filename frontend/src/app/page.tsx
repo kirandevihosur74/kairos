@@ -17,12 +17,20 @@ export default function Home() {
           </p>
         </div>
 
-        <Link
-          href="/styleguide"
-          className="inline-flex h-11 items-center justify-center rounded-full border border-line bg-card px-5 text-[15px] font-medium text-ink"
-        >
-          Open styleguide
-        </Link>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/styleguide"
+            className="inline-flex h-11 items-center justify-center rounded-full border border-line bg-card px-5 text-[15px] font-medium text-ink"
+          >
+            Open styleguide
+          </Link>
+          <Link
+            href="/your-data"
+            className="inline-flex h-11 items-center justify-center rounded-full border border-line bg-card px-5 text-[15px] font-medium text-ink"
+          >
+            Your data
+          </Link>
+        </div>
       </div>
     </PhoneShell>
   );
