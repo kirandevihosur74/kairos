@@ -18,7 +18,6 @@ import {
   type DraftKind,
   type PersonCard,
 } from "@/lib/api";
-import { useSession } from "@/lib/session";
 
 type Channel = "email" | "linkedin";
 
@@ -36,7 +35,6 @@ const kindTone: Record<DraftKind, "outline" | "cream" | "amber"> = {
 
 function DraftReview({ draftId }: { draftId: string }) {
   const router = useRouter();
-  const { conferenceId } = useSession();
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [person, setPerson] = useState<PersonCard | null>(null);
@@ -63,8 +61,7 @@ function DraftReview({ draftId }: { draftId: string }) {
         setBody(d.body);
         setLinkedinMessage(d.linkedin_message);
         try {
-          const cid = d.conference_id;
-          const p = await api.getPerson(d.person_id, cid);
+          const p = await api.getPerson(d.person_id, d.conference_id);
           if (!cancelled) setPerson(p);
         } catch {
           // Non-blocking.
@@ -83,7 +80,7 @@ function DraftReview({ draftId }: { draftId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [draftId, conferenceId]);
+  }, [draftId]);
 
   const dirty = useMemo(() => {
     if (!draft) return false;
@@ -320,7 +317,7 @@ function DraftReview({ draftId }: { draftId: string }) {
       </div>
 
       {/* Bottom action bar */}
-      <div className="mt-auto border-t border-line bg-card px-5 pb-4 pt-3">
+      <div className="app-actions mt-auto border-t border-line bg-card px-5 pb-4 pt-3">
         <div className="flex gap-2.5">
           {editing ? (
             <>

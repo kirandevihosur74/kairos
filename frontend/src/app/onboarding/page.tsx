@@ -3,13 +3,14 @@
 import { Logo } from "@/components/Logo";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Button, PhoneShell } from "@/components";
 import { api } from "@/lib/api";
 import {
   applyPreview,
   describeError,
   emptyDraft,
+  profileToDraft,
   readStoredDraft,
   writeStoredDraft,
   type Draft,
@@ -30,6 +31,18 @@ export default function OnboardingImportPage() {
     setDraft(next);
     writeStoredDraft(next);
   };
+
+  // Reopening onboarding keeps the saved profile editable after a reset or return visit.
+  useEffect(() => {
+    if (draft.name || draft.interests.length) return;
+    let cancelled = false;
+    api.getProfile().then((profile) => {
+      if (!cancelled) persist(profileToDraft(profile));
+    }, () => {});
+    return () => { cancelled = true; };
+    // Hydrate once; later edits must not be overwritten.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const runImportText = async () => {
     if (!pasteText.trim()) return;
@@ -78,7 +91,7 @@ export default function OnboardingImportPage() {
   };
 
   const hasPreview = draft.import_id !== null || !!draft.resumeFileName;
-  const canContinue = hasPreview;
+  const canContinue = draft.name.trim().length > 0 || hasPreview;
 
   return (
     <PhoneShell withNavSpacer={false}>

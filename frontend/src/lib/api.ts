@@ -1,3 +1,5 @@
+import { forgetConference } from "./session";
+
 // Same-origin by default: next.config.ts forwards /api/v1 to the backend. Set NEXT_PUBLIC_API_URL
 // to an absolute URL only to call a backend directly (that needs KAIROS_FRONTEND_ORIGIN for CORS).
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
@@ -287,6 +289,7 @@ async function request<T>(
     } catch {
       // Non-JSON body; keep statusText.
     }
+    if (res.status === 404 && detail === "Conference not found") forgetConference();
     throw new ApiError(res.status, detail);
   }
   if (res.status === 204) return undefined as T;

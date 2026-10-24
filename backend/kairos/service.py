@@ -44,6 +44,12 @@ def notes_for(store, pid):
     )
 
 
+def event_key(url):
+    """One key per event page: scheme, a leading www. and a trailing slash do not make a different event."""
+    host_and_path = (url or "").split("://", 1)[-1].lower()
+    return host_and_path.removeprefix("www.").rstrip("/")
+
+
 def memory(store, p):
     """What the user's graph already knows that bears on this person: their own earlier meetings with
     the same person at other events, and conversations with colleagues at the same company.
@@ -51,6 +57,8 @@ def memory(store, p):
     Only the user's recorded interactions count; merely appearing at the same company is not memory.
     """
     conferences = {c["id"]: c for c in store.all("conference")}
+    # Earlier copies of this same event page are not "another event"; their people are the same people.
+    here = event_key(conferences.get(p["conference_id"], {}).get("url"))
     notes, drafts = {}, {}
     for n in store.all("note"):
         notes.setdefault(n["person_id"], []).append(n)
@@ -60,6 +68,8 @@ def memory(store, p):
     items = []
     for relation, other in store.related(p):
         event = conferences.get(other["conference_id"], {})
+        if relation == "same_person" and event_key(event.get("url")) == here:
+            continue
         where = event.get("name") or "another event"
         about = {k: other.get(k) for k in ("id", "name", "title", "company")}
         if relation == "same_person":

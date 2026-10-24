@@ -4,8 +4,9 @@ set -euo pipefail
 
 DATA="${SPAWNPOINT_DATA_DIR:-/data}"
 mkdir -p "$DATA/falkordb" "$DATA/snapshots" "$DATA/logs"
-# Ship known event pages so the first load of the demo events is instant; never overwrite fresher ones.
-cp -n /app/seed-snapshots/*.json "$DATA/snapshots/" 2>/dev/null || true
+# Ship known event pages so the first load of the demo events is instant. -u replaces a snapshot only
+# when the shipped one is newer (e.g. re-extracted with photos), never a fresher one fetched on the server.
+cp -u /app/seed-snapshots/*.json "$DATA/snapshots/" 2>/dev/null || true
 
 redis-server --loadmodule /var/lib/falkordb/bin/falkordb.so \
   --bind 127.0.0.1 --port 6379 --dir "$DATA/falkordb" --appendonly yes &

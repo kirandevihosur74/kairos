@@ -24,7 +24,7 @@ type LoadState = "loading" | "ready" | "error";
 
 function PersonPageRoute() {
   const params = useParams<{ id: string }>();
-  const id = params?.id;
+  const id = params?.id ? decodeURIComponent(params.id) : undefined;
   if (!id) return null;
   return (
     <RequireProfile>
@@ -184,7 +184,7 @@ function PersonPageInner({ id }: { id: string }) {
 
         <NotesHistory notes={person.notes} />
 
-        <div className="flex flex-col gap-3 pt-2">
+        <div className="app-actions flex flex-col gap-3 pb-2">
           <Link href={`/person/${encodeURIComponent(person.id)}/note`} className="w-full">
             <Button variant="primary" size="lg" fullWidth>
               Capture a note
@@ -220,12 +220,9 @@ function TopBar({ onBack }: { onBack: () => void }) {
 function PersonHeader({ person }: { person: PersonCard }) {
   const subtitle = [person.title, person.company].filter(Boolean).join(" · ");
   const sampleData = person.data_mode === "fixture";
-  const matchLabel =
-    person.match_confidence === "high"
-      ? "High confidence"
-      : person.match_confidence === "medium"
-        ? "Medium confidence"
-        : "Low confidence";
+  const matched = person.why.nodes.filter((n) => n.type === "Topic").length;
+  const totalInterests = person.score > 0 ? Math.round(matched / person.score) : null;
+  const matchLabel = totalInterests ? `Matches ${matched} of ${totalInterests} interests` : "No shared interests yet";
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-3.5">
@@ -242,6 +239,7 @@ function PersonHeader({ person }: { person: PersonCard }) {
       <div className="flex flex-wrap items-center gap-2">
         {person.triage === "interesting" ? <Chip tone="on">Interesting</Chip> : null}
         {person.met ? <Chip tone="on">Met</Chip> : null}
+        {person.triage === "not_interesting" ? <Chip tone="outline">Skipped</Chip> : null}
         {sampleData ? <Chip tone="outline">Sample data</Chip> : null}
         <Chip tone="outline">{matchLabel}</Chip>
       </div>

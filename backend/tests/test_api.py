@@ -110,7 +110,9 @@ def test_import_requires_confirmation(client):
     assert preview["suggested_profile"]["skills"] == ["python", "postgresql"]
     assert client.get("/api/v1/profile").status_code == 409
     assert client.post("/api/v1/onboarding", json={**PROFILE, "import_id": preview["id"]}).status_code == 200
-    assert client.post("/api/v1/onboarding", json={**PROFILE, "import_id": "missing"}).status_code == 404
+    # A stale import (e.g. from before a data reset) never blocks saving the reviewed profile.
+    stale = client.post("/api/v1/onboarding", json={**PROFILE, "import_id": "missing"})
+    assert stale.status_code == 200 and stale.json()["import_id"] is None
 
 
 def test_resume_validation(client):
@@ -279,3 +281,14 @@ def test_event_url_without_scheme_is_accepted(client):
     response = client.post("/api/v1/conference", json={"url": "example.invalid/event"})
     assert response.status_code == 201, response.text
     assert response.json()["url"] == "https://example.invalid/event"
+
+
+def test_adding_the_same_event_again_reopens_it(client):
+    cid, people = seed(client)
+    client.post("/api/v1/triage", json={"conference_id": cid, "person_id": people[0]["id"], "decision": "interesting"})
+    again = client.post("/api/v1/conference", json={"url": "https://www.example.invalid/event/"})
+    assert again.status_code == 201
+    assert again.json()["conference_id"] == cid  # same page: same event, shortlist kept
+    assert [c["conference_id"] for c in client.get("/api/v1/conferences").json()] == [cid]
+    other = client.post("/api/v1/conference", json={"url": "https://example.invalid/other"}).json()
+    assert other["conference_id"] != cid

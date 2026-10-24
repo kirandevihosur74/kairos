@@ -149,6 +149,14 @@ function AddEventForm() {
           </div>
         ) : null}
 
+        <button
+          type="button"
+          onClick={() => router.push("/events")}
+          className="self-start text-[13px] font-medium text-ink underline underline-offset-2"
+        >
+          Or open one of your events →
+        </button>
+
         <div className="mt-auto pt-6">
           <Button
             variant="primary"

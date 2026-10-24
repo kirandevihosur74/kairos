@@ -47,6 +47,7 @@ export function Avatar({ name, src, size = "md", className }: AvatarProps) {
         width={dims.px}
         height={dims.px}
         unoptimized
+        referrerPolicy="no-referrer"
         onError={() => setFailedSrc(src)}
         className={cn(
           dims.cls,

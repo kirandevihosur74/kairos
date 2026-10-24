@@ -93,6 +93,18 @@ export function SessionProvider({
   return <>{children}</>;
 }
 
+/**
+ * Drop the selected event when the server no longer has it (e.g. after a data reset), so screens
+ * redirect to event selection instead of failing on every request.
+ */
+export function forgetConference() {
+  hydrate();
+  if (current.conferenceId === null) return;
+  current = { conferenceId: null, currentPersonId: null };
+  persist();
+  notify();
+}
+
 export function useSession(): SessionContextValue {
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
