@@ -1,27 +1,75 @@
 # Kairos
 
-**Walk in knowing the room.**
+**Meet the right people. Follow up with purpose.**
 
-Kairos helps conference attendees with a sales or BD goal find relevant people, understand why they match, remember conversations, and prepare specific follow-ups.
+Backend-first MVP for job seekers networking at conferences. Enter career goals, discover relevant people, understand the match, save conversation notes, and prepare introductions, follow-ups, or referral requests.
 
-Built for Patch the Conference, October 24, 2026.
+## Run locally (no API keys or Docker needed)
 
-## Current status
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
-Planning and frontend handoff starter. No application server, live ingestion, graph database integration, or AI agent is implemented yet. All fixture people are fictional and visibly marked as demo data.
+```sh
+uv sync --frozen
+uv run uvicorn kairos.app:app --app-dir backend --host 127.0.0.1 --port 8000
+```
 
-- [MVP plan](docs/MVP_PLAN.md): scope, architecture, milestones, and demo acceptance checks.
-- [API contract](docs/API_CONTRACT.md): proposed frontend/backend handshake.
-- [Sample people](backend/fixtures/people.json): five fictional cards for frontend development.
+Open http://127.0.0.1:8000/docs for the interactive API. Health: http://127.0.0.1:8000/health.
 
-## Intended stack
+The default is **SQLite development storage, fictional fixture people, and template drafts**. It is a functioning persistent API, not a live-data or AI demo. No external requests are made to the supplied event or LinkedIn URLs.
 
-Michelle: Next.js, React, Tailwind. Kiran: FastAPI, FalkorDB, Bright Data. Follow-up generation: OpenAI; TrueForge integration after the core flow works. Chloe: pitch and demo evidence.
+## Run with FalkorDB
 
-The initial demo is single-user and limited to one supported conference source. General conference discovery and production accounts are later work.
+With Docker running:
 
-## Development workflow
+```sh
+docker compose up --build
+```
 
-Create a branch such as `codex/graph-ranking`, make a focused change, and open a PR describing behavior and validation. Install Qodo on this repository to start collecting real review feedback; it is not configured by this starter. Do not claim sponsor integrations until demonstrated.
+This starts FalkorDB plus the API; both ports are bound to localhost. Graph data persists in a named Docker volume. Or run the API locally against a cloud/local graph:
 
-Never commit credentials, resumes, connection exports, or scraped personal records. `.env.example` documents configuration names only. Use sanitized fixtures in Git and keep runtime snapshots local.
+```sh
+KAIROS_STORAGE=falkordb KAIROS_FALKORDB_URL=redis://localhost:6379 \
+  uv run uvicorn kairos.app:app --app-dir backend --host 127.0.0.1 --port 8000
+```
+
+Use `rediss://` for TLS endpoints. Store credentials only in an ignored `.env` file; `.env.example` lists the supported `KAIROS_` variables. No silent fallback occurs if the graph is unavailable.
+
+FalkorDB stores profiles, career topic paths, conference people, triage, individual notes, and drafts. Ranking traverses `User → Goal → Topic ← Person → Conference`. SQLite is an explicit substitute for local development with the same API; it does not qualify as FalkorDB usage.
+
+## What works
+
+- Manual career onboarding and updates: target roles, skills, interests, background, location preferences, optional LinkedIn URL.
+- Pasted resume/assistant-summary text and text-based PDF uploads (2 MB, 10 pages maximum), with conservative keyword suggestions followed by user confirmation. No OCR or LLM extraction.
+- Five fictional event people, scored by selected interest overlap with explainable paths.
+- Interesting/not-interesting/reset, priorities, and conference-scoped people.
+- Append-only meeting notes and persistent editable drafts.
+- Introduction, post-meeting follow-up, and referral templates with grounding references. Referrals require a saved meeting note plus a job link and description.
+- Explicit approval for copying, and edits reset approval. No sending endpoint.
+- Optional shared demo API key, configured CORS, upload limits, health endpoint, automated tests, and CI with a real FalkorDB service.
+
+## Frontend handoff
+
+See [API contract](docs/API_CONTRACT.md), [example responses](docs/frontend-examples.json), and [build plan](docs/MVP_PLAN.md). Run the walkthrough below against a local server:
+
+```sh
+uv run python backend/smoke.py
+```
+
+The base URL is `http://127.0.0.1:8000/api/v1`. Default allowed frontend origin is `http://localhost:3000`; configure `KAIROS_FRONTEND_ORIGIN` to match your frontend exactly. If `KAIROS_API_KEY` is configured, send `X-API-Key` on API requests. This is a shared, single-user demo, not account authentication. Keep it on localhost until authentication and deployment controls are added.
+
+## Verification
+
+```sh
+uv run ruff check backend
+uv run pytest -q
+# With FalkorDB running, exercise both storage engines:
+TEST_FALKORDB_URL=redis://localhost:6379 uv run pytest -q
+```
+
+Without `TEST_FALKORDB_URL`, graph integration tests are explicitly skipped. GitHub CI supplies it and runs both stores.
+
+## Next slices
+
+Bright Data live event ingestion with verified sources and snapshot fallback; OpenAI-grounded drafting; optional TrueForge agent integration; real LinkedIn extraction; frontend based on the team's Figma design. These are not implemented in this PR. Qodo installation and branch protection are still repository setup tasks.
+
+Use small PRs. Never commit credentials, private resumes, scraped personal records, or connection exports. The demo fixtures are fictional.
