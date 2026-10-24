@@ -1,12 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type ChangeEvent } from "react";
-import { Button, PhoneShell, SectionLabel } from "@/components";
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+} from "react";
+import { Button, Chip, PhoneShell, SectionLabel } from "@/components";
 import { api } from "@/lib/api";
-import { ChipField } from "./ChipField";
 import {
   applyPreview,
+  dedupe,
   describeError,
   emptyDraft,
   readStoredDraft,
@@ -15,6 +20,98 @@ import {
 } from "./draft";
 
 type Mode = "idle" | "paste";
+type FieldKey = "target_roles" | "interests" | "skills";
+
+function CheckBadge() {
+  return (
+    <svg
+      viewBox="0 0 14 14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="inline-block h-[14px] w-[14px] text-[#0f7b3f]"
+      aria-hidden
+    >
+      <path d="M2.5 7.5l3 3 6-6.5" />
+    </svg>
+  );
+}
+
+interface InlineChipGridProps {
+  values: string[];
+  onChange: (next: string[]) => void;
+  placeholder: string;
+}
+
+function InlineChipGrid({ values, onChange, placeholder }: InlineChipGridProps) {
+  const [adding, setAdding] = useState(false);
+  const [input, setInput] = useState("");
+
+  const commit = () => {
+    const parts = input
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length) onChange(dedupe([...values, ...parts]));
+    setInput("");
+    setAdding(false);
+  };
+
+  const remove = (value: string) => {
+    onChange(values.filter((v) => v !== value));
+  };
+
+  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      commit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setInput("");
+      setAdding(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {values.map((value) => (
+        <Chip
+          key={value}
+          tone="on"
+          className="cursor-pointer"
+          onClick={() => remove(value)}
+          role="button"
+          aria-label={`Remove ${value}`}
+        >
+          {value} <span className="text-muted">✕</span>
+        </Chip>
+      ))}
+      {adding ? (
+        <input
+          autoFocus
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKey}
+          onBlur={commit}
+          placeholder={placeholder}
+          className="min-w-[120px] rounded-full border border-dashed border-ink bg-transparent px-3 py-[7px] text-[13px] font-medium text-ink placeholder:text-faint focus:outline-none"
+        />
+      ) : (
+        <Chip
+          tone="suggest"
+          className="cursor-pointer"
+          onClick={() => setAdding(true)}
+          role="button"
+          aria-label="Add"
+        >
+          + Add
+        </Chip>
+      )}
+    </div>
+  );
+}
 
 export default function OnboardingImportPage() {
   const router = useRouter();
@@ -30,13 +127,17 @@ export default function OnboardingImportPage() {
     writeStoredDraft(next);
   };
 
+  const setField = (key: FieldKey, next: string[]) => {
+    persist({ ...draft, [key]: next });
+  };
+
   const runImportText = async () => {
     if (!pasteText.trim()) return;
     setImporting(true);
     setError(null);
     try {
       const preview = await api.importText("resume_text", pasteText);
-      persist(applyPreview(draft, preview, draft.resumeFileName ?? null));
+      persist(applyPreview(draft, preview, draft.resumeFileName ?? "Pasted summary"));
       setPasteText("");
       setMode("idle");
     } catch (err) {
@@ -62,7 +163,6 @@ export default function OnboardingImportPage() {
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) void runImportFile(file);
-    // Reset so re-selecting the same file still fires change.
     e.target.value = "";
   };
 
@@ -84,7 +184,9 @@ export default function OnboardingImportPage() {
       <div className="flex flex-1 flex-col gap-6 px-5 pb-10 pt-2">
         <div className="flex items-start justify-between gap-3 pt-1">
           <p className="font-serif text-[24px] leading-none text-ink">kairos</p>
-          <p className="pt-2 text-[13px] text-muted">Step 1 of 3</p>
+          <Chip tone="outline" className="mt-1 text-[12px]">
+            Step 1 of 3
+          </Chip>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -108,8 +210,8 @@ export default function OnboardingImportPage() {
                   Text-based PDF, up to 2 MB and 10 pages
                 </p>
               </div>
-              <span className="pt-1 text-[13px] font-semibold text-[#0f7b3f]">
-                Read ✓
+              <span className="inline-flex items-center gap-1 pt-1 text-[13px] font-semibold text-[#0f7b3f]">
+                Read <CheckBadge />
               </span>
             </div>
           ) : (
@@ -179,13 +281,7 @@ export default function OnboardingImportPage() {
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-4">
-          <SectionLabel>
-            {hasPreview
-              ? "Suggested from your resume · confirm or remove"
-              : "Fill these in — or import above"}
-          </SectionLabel>
-
+        <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-2">
             <p className="text-[13px] font-medium text-ink">Name</p>
             <input
@@ -196,36 +292,30 @@ export default function OnboardingImportPage() {
             />
           </div>
 
-          <ChipField
-            label="Target roles"
-            values={draft.target_roles}
-            onChange={(target_roles) => persist({ ...draft, target_roles })}
-            placeholder="e.g. Backend engineer"
-          />
+          <div className="flex flex-col gap-3">
+            <SectionLabel>Target roles</SectionLabel>
+            <InlineChipGrid
+              values={draft.target_roles}
+              onChange={(next) => setField("target_roles", next)}
+              placeholder="e.g. Backend engineer"
+            />
+          </div>
 
-          <ChipField
-            label="Interests"
-            helper="used to rank who you meet"
-            values={draft.interests}
-            onChange={(interests) => persist({ ...draft, interests })}
-            placeholder="e.g. distributed systems"
-          />
+          <div className="flex flex-col gap-3">
+            <SectionLabel>Interests · used for ranking</SectionLabel>
+            <InlineChipGrid
+              values={draft.interests}
+              onChange={(next) => setField("interests", next)}
+              placeholder="e.g. distributed systems"
+            />
+          </div>
 
-          <ChipField
-            label="Skills"
-            values={draft.skills}
-            onChange={(skills) => persist({ ...draft, skills })}
-            placeholder="e.g. python, fastapi"
-          />
-
-          <div className="flex flex-col gap-2">
-            <p className="text-[13px] font-medium text-ink">About you</p>
-            <textarea
-              value={draft.background}
-              onChange={(e) => persist({ ...draft, background: e.target.value })}
-              rows={3}
-              placeholder="One line on what you build and where you want to go."
-              className="rounded-[12px] border border-line bg-card px-4 py-3 text-[14px] leading-[1.4] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
+          <div className="flex flex-col gap-3">
+            <SectionLabel>Skills</SectionLabel>
+            <InlineChipGrid
+              values={draft.skills}
+              onChange={(next) => setField("skills", next)}
+              placeholder="e.g. python, fastapi"
             />
           </div>
 
