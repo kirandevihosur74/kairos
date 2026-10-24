@@ -25,4 +25,6 @@ COPY seed-snapshots ./seed-snapshots
 COPY deploy/spawnpoint/start.sh ./start.sh
 ENV PORT=8080
 EXPOSE 8080
-CMD ["bash", "/app/start.sh"]
+# Replace the base image's entrypoint, which would start FalkorDB Browser (a database admin UI) on $PORT.
+ENTRYPOINT ["bash", "/app/start.sh"]
+CMD []
