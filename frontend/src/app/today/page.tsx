@@ -9,10 +9,12 @@ import {
   Button,
   Card,
   PhoneShell,
+  ReachabilityPill,
   RequireProfile,
   SectionLabel,
 } from "@/components";
 import { ApiError, api, type PersonCard } from "@/lib/api";
+import { enrichMany, type EnrichedCard } from "@/lib/data/mocks";
 import { useSession } from "@/lib/session";
 
 export default function TodayPage() {
@@ -28,7 +30,7 @@ function TodayView() {
   const { conferenceId, setCurrentPersonId } = useSession();
   const [state, setState] = useState<
     | { kind: "loading" }
-    | { kind: "ready"; people: PersonCard[] }
+    | { kind: "ready"; people: EnrichedCard[] }
     | { kind: "error" }
   >({ kind: "loading" });
 
@@ -41,7 +43,10 @@ function TodayView() {
     api.priorities(conferenceId).then(
       (people) => {
         if (cancelled) return;
-        setState({ kind: "ready", people: people.slice(0, 3) });
+        setState({
+          kind: "ready",
+          people: enrichMany(people.slice(0, 3)),
+        });
       },
       (err) => {
         if (cancelled) return;
@@ -57,7 +62,7 @@ function TodayView() {
     };
   }, [conferenceId, router]);
 
-  function openPerson(person: PersonCard) {
+  function openPerson(person: EnrichedCard) {
     setCurrentPersonId(person.id);
     router.push(`/person/${encodeURIComponent(person.id)}`);
   }
@@ -140,6 +145,7 @@ function TodayView() {
                         name={person.name}
                         src={person.photo_url}
                         size="lg"
+                        strongFit={person.score === 1.0}
                       />
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="truncate text-[14px] text-ink">
@@ -158,6 +164,12 @@ function TodayView() {
                           </span>
                         )}
                       </span>
+                      {person.reachability_tag ? (
+                        <ReachabilityPill
+                          value={person.reachability_tag}
+                          size="sm"
+                        />
+                      ) : null}
                       <span
                         aria-hidden
                         className="shrink-0 text-[18px] leading-none text-faint"

@@ -8,10 +8,12 @@ import {
   Button,
   Card,
   PhoneShell,
+  ReachabilityPill,
   RequireProfile,
   SectionLabel,
 } from "@/components";
-import { ApiError, api, type PersonCard } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
+import { enrichMany, type EnrichedCard } from "@/lib/data/mocks";
 import { useSession } from "@/lib/session";
 
 const DAILY_GOAL = 10;
@@ -29,7 +31,7 @@ function RecapView() {
   const { conferenceId, setCurrentPersonId } = useSession();
   const [state, setState] = useState<
     | { kind: "loading" }
-    | { kind: "ready"; people: PersonCard[]; drafts: number; eventName: string | null }
+    | { kind: "ready"; people: EnrichedCard[]; drafts: number; eventName: string | null }
     | { kind: "error" }
   >({ kind: "loading" });
 
@@ -46,7 +48,7 @@ function RecapView() {
     ]).then(
       ([people, drafts, conference]) => {
         if (cancelled) return;
-        setState({ kind: "ready", people, drafts: drafts.length, eventName: conference.name });
+        setState({ kind: "ready", people: enrichMany(people), drafts: drafts.length, eventName: conference.name });
       },
       (err) => {
         if (cancelled) return;
@@ -62,7 +64,7 @@ function RecapView() {
     };
   }, [conferenceId, router]);
 
-  function openPerson(person: PersonCard) {
+  function openPerson(person: EnrichedCard) {
     setCurrentPersonId(person.id);
     router.push(`/person/${encodeURIComponent(person.id)}`);
   }
@@ -150,6 +152,7 @@ function RecapView() {
                         name={person.name}
                         src={person.photo_url}
                         size="lg"
+                        strongFit={person.score === 1.0}
                       />
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="truncate text-[14px] text-ink">
@@ -163,12 +166,12 @@ function RecapView() {
                               .join(" @ ")}
                         </span>
                       </span>
-                      <span
-                        aria-hidden
-                        className="shrink-0 text-[18px] leading-none text-faint"
-                      >
-                        →
-                      </span>
+                      {person.reachability_tag ? (
+                        <ReachabilityPill
+                          value={person.reachability_tag}
+                          size="sm"
+                        />
+                      ) : null}
                     </button>
                   </li>
                 ))}
@@ -194,6 +197,7 @@ function RecapView() {
                         name={person.name}
                         src={person.photo_url}
                         size="lg"
+                        strongFit={person.score === 1.0}
                       />
                       <div className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate text-[14px] text-ink">
@@ -207,6 +211,12 @@ function RecapView() {
                           </span>
                         )}
                       </div>
+                      {person.reachability_tag ? (
+                        <ReachabilityPill
+                          value={person.reachability_tag}
+                          size="sm"
+                        />
+                      ) : null}
                       <Button
                         size="sm"
                         variant="secondary"

@@ -9,11 +9,14 @@ import {
   Button,
   Card,
   Chip,
+  FactList,
   PhoneShell,
+  ReachabilityPill,
   RequireProfile,
   SectionLabel,
 } from "@/components";
 import { ApiError, api, type PersonCard } from "@/lib/api";
+import { enrich, type EnrichedCard } from "@/lib/data/mocks";
 import { useSession } from "@/lib/session";
 import { MemorySection } from "./_components/MemorySection";
 import { WhyPathDiagram } from "./_components/WhyPath";
@@ -42,7 +45,7 @@ export default function PersonPage() {
 function PersonPageInner({ id }: { id: string }) {
   const router = useRouter();
   const { conferenceId, setCurrentPersonId } = useSession();
-  const [person, setPerson] = useState<PersonCard | null>(null);
+  const [person, setPerson] = useState<EnrichedCard | null>(null);
   const [status, setStatus] = useState<LoadState>("loading");
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +63,7 @@ function PersonPageInner({ id }: { id: string }) {
     api.getPerson(id, conferenceId).then(
       (p) => {
         if (cancelled) return;
-        setPerson(p);
+        setPerson(enrich(p));
         setStatus("ready");
       },
       (err) => {
@@ -130,6 +133,33 @@ function PersonPageInner({ id }: { id: string }) {
           </Card>
         </section>
 
+        {person.three_facts.length > 0 ? (
+          <section className="flex flex-col gap-2">
+            <SectionLabel>Three things</SectionLabel>
+            <Card radius="lg" padded>
+              <FactList facts={person.three_facts} />
+            </Card>
+          </section>
+        ) : null}
+
+        {person.warm_intro_hint ? (
+          <section className="flex flex-col gap-2">
+            <SectionLabel>Warm intro</SectionLabel>
+            <Card radius="lg" padded>
+              <p className="text-[14px] leading-[1.45] text-ink">
+                Mention{" "}
+                <span className="font-semibold">
+                  {person.warm_intro_hint.connector}
+                </span>
+                {person.warm_intro_hint.via
+                  ? `, your connection at ${person.warm_intro_hint.via}`
+                  : null}
+                .
+              </p>
+            </Card>
+          </section>
+        ) : null}
+
         {person.next_step ? (
           <section className="flex flex-col gap-2">
             <SectionLabel>Next step</SectionLabel>
@@ -143,34 +173,12 @@ function PersonPageInner({ id }: { id: string }) {
           </section>
         ) : null}
 
-        {person.fun_fact ? (
+        {person.fun_fact_mock ? (
           <section className="flex flex-col gap-2">
             <SectionLabel>Fun fact</SectionLabel>
             <Card radius="lg" padded>
               <p className="text-[14px] leading-[1.45] text-ink">
-                {person.fun_fact}
-              </p>
-            </Card>
-          </section>
-        ) : null}
-
-        {person.reachability ? (
-          <section className="flex flex-col gap-2">
-            <SectionLabel>Reachability</SectionLabel>
-            <Card radius="lg" padded>
-              <p className="text-[14px] leading-[1.45] text-ink">
-                {person.reachability}
-              </p>
-            </Card>
-          </section>
-        ) : null}
-
-        {person.warm_intro ? (
-          <section className="flex flex-col gap-2">
-            <SectionLabel>Warm intro</SectionLabel>
-            <Card radius="lg" padded>
-              <p className="text-[14px] leading-[1.45] text-ink">
-                {person.warm_intro}
+                {person.fun_fact_mock}
               </p>
             </Card>
           </section>
@@ -215,19 +223,17 @@ function TopBar({ onBack }: { onBack: () => void }) {
   );
 }
 
-function PersonHeader({ person }: { person: PersonCard }) {
+function PersonHeader({ person }: { person: EnrichedCard }) {
   const subtitle = [person.title, person.company].filter(Boolean).join(" · ");
-  const sampleData = person.data_mode === "fixture";
-  const matchLabel =
-    person.match_confidence === "high"
-      ? "Matches high"
-      : person.match_confidence === "medium"
-        ? "Matches medium"
-        : "Matches low";
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-4">
-        <Avatar name={person.name} src={person.photo_url} size="ring" />
+        <Avatar
+          name={person.name}
+          src={person.photo_url}
+          size="ring"
+          strongFit={person.score === 1.0}
+        />
         <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
           <h1 className="font-serif text-[28px] leading-[1.05] text-ink">
             {person.name}
@@ -236,11 +242,15 @@ function PersonHeader({ person }: { person: PersonCard }) {
             <p className="text-[13px] text-muted">{subtitle}</p>
           ) : null}
         </div>
+        {person.reachability_tag ? (
+          <ReachabilityPill value={person.reachability_tag} size="sm" />
+        ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {person.met ? <Chip tone="on">Met</Chip> : null}
-        {sampleData ? <Chip tone="outline">Sample data</Chip> : null}
-        <Chip tone="outline">{matchLabel}</Chip>
+        <Chip tone="outline">
+          {person.verified_match ? "✓ Verified match" : "Sample data"}
+        </Chip>
       </div>
     </div>
   );
