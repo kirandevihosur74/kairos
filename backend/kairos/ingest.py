@@ -97,6 +97,8 @@ def _judges(description):
         return []
     judges = []
     for line in lines[start + 1 :]:
+        if not line:
+            continue  # pages separate judges with empty paragraphs
         match = re.fullmatch(r"(.{1,80}?)\s+[—–-]\s+(.+)", line)
         if not match:
             if judges:
@@ -105,6 +107,8 @@ def _judges(description):
         name, role = match.groups()
         current = role.split(";")[0].strip()
         title, _, company = current.partition(" @ ")
+        # "Product Lead @ Microsoft, building agents" -> company "Microsoft"; the full text stays in bio.
+        company = company.split(",")[0]
         judges.append({"name": name.strip(), "title": title.strip(), "company": company.strip(), "bio": role})
     return judges
 

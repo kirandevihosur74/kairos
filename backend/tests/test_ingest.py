@@ -139,3 +139,24 @@ def test_failed_fetch_falls_back_to_stale_snapshot(live):
     response = add_event(client)
     assert response.status_code == 502
     assert "no snapshot" in response.json()["detail"]
+
+
+def test_judges_separated_by_blank_paragraphs_are_all_kept():
+    # Real Luma pages put an empty paragraph between judges; the list must not end at the first blank line.
+    description = {
+        "type": "doc",
+        "content": [
+            paragraph("Meet the Judges"),
+            paragraph("Avery Example — Product Lead @ Example Labs, building agents; ex-Startup Co"),
+            {"type": "paragraph", "content": []},
+            paragraph("Casey Example — UX Designer @ Example Retail"),
+            {"type": "paragraph", "content": []},
+            paragraph("Drew Example — Software Engineer @ Example AI"),
+            {"type": "paragraph", "content": []},
+            paragraph("More judges will be announced soon."),
+        ],
+    }
+    judges = ingest._judges(description)
+    assert [j["name"] for j in judges] == ["Avery Example", "Casey Example", "Drew Example"]
+    assert (judges[0]["title"], judges[0]["company"]) == ("Product Lead", "Example Labs")
+    assert "building agents" in judges[0]["bio"]
