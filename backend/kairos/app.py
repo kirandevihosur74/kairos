@@ -6,15 +6,18 @@ from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 from redis.exceptions import RedisError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import voice
+from . import logs, voice
 from .config import Settings
 from .ingest import canonical_url, is_luma, load_event
 from .models import ConferenceInput, DraftEdit, DraftInput, NoteInput, Profile, TextImport, TriageInput
@@ -28,6 +31,7 @@ MAX_UPLOAD = 2 * 1024 * 1024
 
 def create_app(settings: Settings | None = None):
     settings = settings or Settings()
+    logs.setup(settings.log_level, settings.log_file)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -77,9 +81,35 @@ def create_app(settings: Settings | None = None):
             request._body = bytes(data)
         return await call_next(request)
 
+    @app.middleware("http")
+    async def trace(request, call_next):
+        # Outermost: every request gets an id that appears on all log lines it causes.
+        token = logs.request_id.set(uuid4().hex[:6])
+        try:
+            with logs.Timer() as t:
+                response = await call_next(request)
+            level = logging.WARNING if response.status_code >= 400 else logging.INFO
+            if request.url.path != "/health" or response.status_code != 200:
+                logs.event("http", level, method=request.method, path=request.url.path, status=response.status_code, ms=t.ms)
+            return response
+        finally:
+            logs.request_id.reset(token)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def explained(request, exc):
+        # Client and dependency errors carry a reason; log it so a failing screen can be traced.
+        level = logging.ERROR if exc.status_code >= 500 else logging.WARNING
+        logs.event("http.error", level, path=request.url.path, status=exc.status_code, detail=exc.detail)
+        return await http_exception_handler(request, exc)
+
+    @app.exception_handler(Exception)
+    async def crashed(request, exc):
+        logs.log.exception("http.crash path=%s error=%s", request.url.path, type(exc).__name__)
+        return JSONResponse(status_code=500, content={"detail": "Internal error; see server logs"})
+
     @app.exception_handler(RedisError)
     async def unavailable(request, exc):
-        log.warning("Graph unavailable: %s", type(exc).__name__)
+        logs.event("graph.unavailable", logging.ERROR, error=type(exc).__name__)
         return JSONResponse(status_code=503, content={"detail": "Graph database unavailable"})
 
     def auth(x_api_key: Annotated[str | None, Header()] = None):
@@ -182,6 +212,7 @@ def create_app(settings: Settings | None = None):
             "error": None,
         }
         store().put("conference", conference)
+        logs.event("conference.create", id=cid, mode=body.data_mode, url=url)
         try:
             if live:
                 event, freshness = load_event(url, settings, now())
@@ -202,10 +233,12 @@ def create_app(settings: Settings | None = None):
             for p in people:
                 store().put("person", {**p, "id": cid + ":" + p["id"], "conference_id": cid})
             conference.update(stage="ready", people_found=len(people))
+            logs.event("conference.ready", id=cid, people=len(people), freshness=conference.get("freshness"), source=conference.get("source"))
         except HTTPException as exc:
             store().put("conference", {**conference, "stage": "failed", "error": exc.detail})
             raise
         except Exception:
+            logs.log.exception("conference.failed id=%s", cid)
             store().put("conference", {**conference, "stage": "failed", "error": "People loading failed"})
             raise
         store().put("conference", conference)
@@ -270,17 +303,21 @@ def create_app(settings: Settings | None = None):
     @app.get(api + "/people/{pid}/memory", dependencies=protected)
     def get_memory(pid: str, conference_id: str):
         """Graph memory: earlier meetings with this person at other events, and colleague conversations."""
-        return memory(store(), person(store(), pid, conference_id))
+        result = memory(store(), person(store(), pid, conference_id))
+        logs.event("memory.query", person=pid, items=len(result["items"]), engine=store().engine)
+        return result
 
     @app.post(api + "/triage", dependencies=protected)
     def triage(body: TriageInput):
         person(store(), body.person_id, body.conference_id)
+        logs.event("triage.saved", person=body.person_id, decision=body.decision)
         return store().put("triage", {**body.model_dump(), "id": body.person_id, "updated_at": now()})
 
     @app.post(api + "/met", status_code=201, dependencies=protected)
     def met(body: NoteInput):
         person(store(), body.person_id, body.conference_id)
         nid = uid("note")
+        logs.event("note.saved", person=body.person_id, chars=len(body.note))
         return store().put(
             "note",
             {
@@ -317,9 +354,12 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(413, "Voice note must be at most 10 MB")
         if not audio:
             raise HTTPException(422, "Empty recording")
+        logs.event("voice.start", format=ext, bytes=len(audio), model=settings.openai_transcribe_model, person=person_id)
         try:
-            text = voice.transcribe(audio, ext, settings)
+            with logs.Timer() as t:
+                text = voice.transcribe(audio, ext, settings)
         except voice.TranscriptionError as exc:
+            logs.event("voice.failed", logging.WARNING, error=exc)
             raise HTTPException(502, f"Transcription failed ({exc}); try again or type the note") from None
         if not text:
             raise HTTPException(422, "No speech detected; try again or type the note")
@@ -328,6 +368,7 @@ def create_app(settings: Settings | None = None):
             people = [p for p in s.all("person") if p["conference_id"] == conference_id]
             fields = ("id", "name", "title", "company", "photo_url")
             candidates = [{f: p.get(f) for f in fields} for p in voice.mentioned(text, people)]
+        logs.event("voice.done", ms=t.ms, chars=len(text), candidates=len(candidates))
         return {
             "text": text,
             "model": settings.openai_transcribe_model,

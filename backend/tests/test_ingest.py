@@ -296,3 +296,36 @@ def test_non_luma_page_without_openai_is_rejected(settings, tmp_path):
         response = client.post("/api/v1/conference", json={"url": "https://partiful.com/e/abc", "data_mode": "live"})
         assert response.status_code == 503
         assert "OPENAI" in response.json()["detail"]
+
+
+MAIN_PAGE = """<html><head><title>Backend Summit</title></head><body><h1>Backend Summit</h1>
+<p>Join us Nov 12 in San Francisco for a day of talks.</p>
+<a href="/summit/judges">Judges</a> <a href="https://other.example.com/speakers">Elsewhere</a>
+<a href="/summit/register">Register</a></body></html>"""
+JUDGES_PAGE = """<html><body><h2>Judges</h2><ul><li>Morgan Example, Staff Backend Engineer at Example Pay</li></ul></body></html>"""
+
+
+def test_people_pages_are_same_site_people_links_only():
+    assert ingest.people_pages(MAIN_PAGE, "https://summit.example.com/summit") == [
+        "https://summit.example.com/summit/judges"
+    ]
+
+
+def test_main_event_page_follows_its_judges_page(web, monkeypatch, fake_model):
+    client, fetched = web
+    complete, _ = fake_model
+    complete.reply = model_reply([person("Morgan Example", "Staff Backend Engineer", "Example Pay", "judge")])
+    pages = {"https://summit.example.com/summit": MAIN_PAGE, "https://summit.example.com/summit/judges": JUDGES_PAGE}
+
+    def fake_fetch(url, api_key, zone, timeout=60):
+        fetched.append(url)
+        return pages[url]
+
+    monkeypatch.setattr(ingest, "fetch", fake_fetch)
+    conference = client.post(
+        "/api/v1/conference", json={"url": "https://summit.example.com/summit", "data_mode": "live"}
+    ).json()
+    assert conference["people_found"] == 1
+    assert fetched == list(pages)
+    card = client.get("/api/v1/people", params={"conference_id": conference["id"]}).json()[0]
+    assert card["sources"][0]["url"] == "https://summit.example.com/summit/judges"

@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     openai_timeout: float = 30
     # Speech-to-text model for voice notes (whisper-1 still works but is deprecated by OpenAI).
     openai_transcribe_model: str = "gpt-transcribe"
+    # Workflow logs go to stdout and this file; follow them live with `uv run python backend/watch_logs.py`.
+    log_level: str = "INFO"
+    log_file: Path | None = Path("backend/data/logs/kairos.log")
 
     @field_validator("openai_model")
     @classmethod

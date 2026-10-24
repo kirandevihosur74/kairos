@@ -4,6 +4,8 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from . import drafting
+from .logs import Timer
+from .logs import event as log_event
 
 
 def now():
@@ -256,10 +258,14 @@ def make_draft(store, pid, request, settings=None):
         raise HTTPException(503, "AI drafting is not configured; set KAIROS_OPENAI_API_KEY or use template")
     content, mode, model, note = _template(p, user, ns, request), "template", None, None
     if ai_ready and request.generation != "template":
-        context, grounding = _ai_context(p, user, ns, request, memory(store, p)["items"])
+        remembered = memory(store, p)["items"]
+        context, grounding = _ai_context(p, user, ns, request, remembered)
+        log_event("draft.ai.start", person=pid, kind=request.kind, model=settings.openai_model, notes=len(context["notes"]), memory=len(remembered))
         try:
-            ai = drafting.generate(context, settings)
+            with Timer() as t:
+                ai = drafting.generate(context, settings)
         except drafting.DraftingError as exc:
+            log_event("draft.ai.failed", 30, person=pid, error=exc, fallback="none" if request.generation == "ai" else "template")
             if request.generation == "ai":
                 raise HTTPException(502, f"AI drafting failed ({exc}); retry or use template") from None
             # Visible fallback: the draft is labeled template, with the reason, never passed off as AI.
@@ -267,6 +273,8 @@ def make_draft(store, pid, request, settings=None):
         else:
             content = {**ai, "grounded_on": grounding}
             mode, model = "ai", settings.openai_model
+            cited_memory = [c for c in ai.get("cited", []) if c.startswith("memory:")]
+            log_event("draft.ai.done", person=pid, ms=t.ms, cited=len(ai.get("cited", [])), cited_memory=len(cited_memory))
     return {
         "id": uid("draft"),
         "person_id": pid,

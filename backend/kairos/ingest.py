@@ -19,11 +19,13 @@ import urllib.error
 import urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from fastapi import HTTPException
 
 from . import drafting
+from .logs import Timer
+from .logs import event as log_event
 
 BRIGHTDATA_ENDPOINT = "https://api.brightdata.com/request"
 LUMA_HOSTS = {"luma.com", "www.luma.com", "lu.ma"}
@@ -308,9 +310,39 @@ EXTRACT_SCHEMA = {
 }
 
 
-def parse_web(html, url, collected_at, settings):
-    """AI extraction for any public event page. Names the page does not contain verbatim are dropped."""
-    title, text, ld = page_text(html)
+# Sub-pages an event site commonly uses for its people; followed from the page the user pasted.
+PEOPLE_PAGE = re.compile(r"(?i)(^|[/_-])(judges?|speakers?|mentors?|panel(ists)?|line-?up|presenters?|hosts?)([/_.-]|$)")
+MAX_PEOPLE_PAGES = 3
+
+
+def people_pages(html, url):
+    """Same-site links such as /judges or /speakers, resolved and validated, at most MAX_PEOPLE_PAGES."""
+    host = urlsplit(url).hostname
+    found = []
+    for href in re.findall(r'href="([^"#]+)', html):
+        target = urljoin(url, htmllib.unescape(href))
+        parts = urlsplit(target)
+        if parts.hostname != host or not PEOPLE_PAGE.search(parts.path):
+            continue
+        try:
+            target = canonical_url(urlunsplit((parts.scheme, parts.netloc, parts.path, "", "")))
+        except HTTPException:
+            continue
+        if target.rstrip("/") != url.rstrip("/") and target not in found:
+            found.append(target)
+    return found[:MAX_PEOPLE_PAGES]
+
+
+def parse_web(html, url, collected_at, settings, extra_pages=()):
+    """AI extraction for any public event page plus its people sub-pages ([(url, html)]).
+
+    Names that do not appear verbatim on one of the pages are dropped; each person's source is the page
+    that names them.
+    """
+    texts = [(url, page_text(html))] + [(u, page_text(h)) for u, h in extra_pages]
+    title, _, _ = texts[0][1]
+    text = "\n\n".join(t for _, (_, t, _) in texts)
+    ld = "\n".join(d for _, (_, _, d) in texts if d)
     if len(text) < 40 and not ld:
         raise FetchError("Page has no readable content")
     content = {"url": url, "page_title": title, "structured_data": ld[:20000], "page_text": text[:60000]}
@@ -325,8 +357,10 @@ def parse_web(html, url, collected_at, settings):
             "json_schema": {"name": "event_people", "schema": EXTRACT_SCHEMA, "strict": True},
         },
     }
+    log_event("extract.start", url=url, model=settings.openai_model, pages=len(texts), chars=len(text))
     try:
-        data = drafting.complete(payload, settings.openai_api_key, max(settings.openai_timeout, 60))
+        with Timer() as t:
+            data = drafting.complete(payload, settings.openai_api_key, max(settings.openai_timeout, 60))
         message = data["choices"][0]["message"]
         if message.get("refusal"):
             raise FetchError("Extraction refused")
@@ -338,7 +372,7 @@ def parse_web(html, url, collected_at, settings):
         raise FetchError("Extraction returned an unexpected response") from None
     page = _norm(" ".join([title, text, ld]))
     host = urlsplit(url).hostname
-    source = [{"url": url, "collected_at": collected_at}]
+    page_norms = [(u, _norm(" ".join(parts))) for u, parts in texts]
     people, seen = [], set()
     for item in found[:60]:
         name = str(item.get("name") or "").strip()
@@ -370,9 +404,15 @@ def parse_web(html, url, collected_at, settings):
                 # Named on the event page only; identity is not cross-checked against other sources.
                 "match_confidence": "low",
                 "stale": False,
-                "sources": source,
+                "sources": [
+                    {
+                        "url": next((u for u, n in page_norms if _norm(name) in n), url),
+                        "collected_at": collected_at,
+                    }
+                ],
             }
         )
+    log_event("extract.done", url=url, ms=t.ms, returned=len(found), kept=len(people), dropped_unverified=len(found[:60]) - len(people))
     name = str(event.get("name") or "").strip() or title or host
     return {
         "name": name[:200],
@@ -391,10 +431,22 @@ def snapshot_path(directory: Path, url):
     return directory / ("web_" + hashlib.sha256(url.encode()).hexdigest()[:16] + ".json")
 
 
+def _fetch_logged(url, settings, attempt=1):
+    log_event("ingest.fetch.start", url=url, via="brightdata", attempt=attempt)
+    try:
+        with Timer() as t:
+            html = fetch(url, settings.brightdata_api_key, settings.brightdata_zone)
+    except FetchError as exc:
+        log_event("ingest.fetch.failed", 30, url=url, attempt=attempt, error=exc)
+        raise
+    log_event("ingest.fetch.ok", url=url, ms=t.ms, bytes=len(html))
+    return html
+
+
 def _fetch_with_retry(url, settings):
     for attempt in range(2):
         try:
-            return fetch(url, settings.brightdata_api_key, settings.brightdata_zone)
+            return _fetch_logged(url, settings, attempt + 1)
         except FetchError:
             if attempt:
                 raise
@@ -412,22 +464,42 @@ def load_event(url, settings, collected_at):
         raise HTTPException(503, "Non-Luma event pages need AI extraction; set KAIROS_OPENAI_API_KEY")
     path = snapshot_path(settings.snapshot_dir, url)
     if path.exists() and time.time() - path.stat().st_mtime < settings.snapshot_max_age_hours * 3600:
+        log_event("ingest.snapshot.reused", url=url, snapshot=path.name)
         return json.loads(path.read_text()), "cache"
     try:
         if not settings.brightdata_api_key or not settings.brightdata_zone:
             raise FetchError("Bright Data is not configured")
         html = _fetch_with_retry(url, settings)
+        extra = []
+        if not luma:
+            # Many event sites list people on their own pages (/judges, /speakers); read those too.
+            subs = people_pages(html, url)
+            log_event("ingest.subpages", url=url, found=len(subs), pages=",".join(subs) or None)
+            for sub_url in subs:
+                try:
+                    extra.append((sub_url, _fetch_logged(sub_url, settings)))
+                except FetchError:
+                    pass  # the main page still counts; a missing sub-page only means fewer people
         try:
-            event = parse_luma(html, url, collected_at) if luma else parse_web(html, url, collected_at, settings)
+            event = (
+                parse_luma(html, url, collected_at)
+                if luma
+                else parse_web(html, url, collected_at, settings, extra)
+            )
         except (KeyError, IndexError, TypeError, AttributeError, ValueError):
             raise FetchError("Unrecognized event page") from None
     except FetchError as exc:
         if not path.exists():
+            log_event("ingest.failed", 40, url=url, error=exc, snapshot="none")
             raise HTTPException(502, f"Could not load event ({exc}) and no snapshot exists") from None
+        log_event("ingest.stale_snapshot", 30, url=url, error=exc, snapshot=path.name)
         event = json.loads(path.read_text())
         for p in event["people"]:
             p["stale"] = True
         return event, "stale"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(event, indent=1))
+    log_event("ingest.done", url=url, people=len(event["people"]), snapshot=path.name)
+    if not event["people"]:
+        log_event("ingest.no_people", 30, url=url, hint="page lists no speakers/judges/hosts; try its people page")
     return event, "live"
