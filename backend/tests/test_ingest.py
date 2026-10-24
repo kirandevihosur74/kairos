@@ -30,7 +30,11 @@ def luma_page(visibility="public"):
             {"name": "Riley Host", "linkedin_handle": "/in/riley-example", "bio_short": "", "avatar_url": None},
             {"name": "Example Studio", "linkedin_handle": None, "bio_short": ""},
         ],
-        "featured_guests": [{"name": "Private Guest", "linkedin_handle": "/in/private"}],
+        "featured_guests": [
+            {"name": "Public Guest", "linkedin_handle": "/in/public-guest", "bio_short": "Backend engineer"},
+            {"name": "Riley Host"},  # also a host: listed once
+        ],
+        "guest_count": 42,
         "description_mirror": {
             "type": "doc",
             "content": [
@@ -48,10 +52,18 @@ def luma_page(visibility="public"):
     return f'<html><script id="__NEXT_DATA__" type="application/json">{payload}</script></html>'
 
 
-def test_parse_luma_keeps_judges_and_hosts_only():
+def test_parse_luma_keeps_judges_hosts_and_publicly_listed_attendees():
     event = ingest.parse_luma(luma_page(), "https://luma.com/example", COLLECTED)
     people = {p["name"]: p for p in event["people"]}
-    assert set(people) == {"Avery Example", "Casey Example", "Drew Example", "Riley Host"}
+    assert set(people) == {"Avery Example", "Casey Example", "Drew Example", "Riley Host", "Public Guest"}
+    guest = people["Public Guest"]
+    assert (guest["event_role"], guest["title"], guest["linkedin_url"]) == (
+        "attendee",
+        "Attendee",
+        "https://www.linkedin.com/in/public-guest",
+    )
+    assert guest["topics"] == ["backend", "software engineering"]
+    assert event["guest_count"] == 42
     avery = people["Avery Example"]
     assert (avery["title"], avery["company"], avery["event_role"]) == (
         "Applied AI Engineer",
@@ -110,7 +122,7 @@ def test_live_conference_ranks_judges_and_reuses_cache(live):
     assert conference["url"] == "https://luma.com/example"
     assert (conference["name"], conference["people_found"], conference["stale"]) == (
         "Example AI Makeathon",
-        4,
+        5,  # 3 judges, 1 host, 1 publicly listed attendee
         False,
     )
     people = client.get("/api/v1/people", params={"conference_id": conference["id"]}).json()
@@ -349,3 +361,24 @@ def test_photos_follow_card_layout_and_skip_people_without_one():
         ["Avery Example", "Casey Example", "Drew Example", "Eli Example"], [("https://x.example.com/judges", page)]
     )
     assert photos == {"Avery Example": "https://cdn.example.com/a.jpg", "Drew Example": "https://cdn.example.com/d.jpg"}
+
+
+def test_re_adding_a_live_event_refreshes_people_and_keeps_the_shortlist(live, monkeypatch):
+    client, fetcher, calls, settings = live
+    first = add_event(client).json()
+    avery = next(
+        p for p in client.get("/api/v1/people", params={"conference_id": first["id"]}).json() if p["name"] == "Avery Example"
+    )
+    client.post("/api/v1/triage", json={"conference_id": first["id"], "person_id": avery["id"], "decision": "interesting"})
+    # A snapshot written by an older parser is refetched, so people it missed (here: attendees) appear.
+    path = ingest.snapshot_path(settings.snapshot_dir, "https://luma.com/example")
+    old = json.loads(path.read_text())
+    old["people"] = [p for p in old["people"] if p["event_role"] != "attendee"]
+    old.pop("version", None)
+    path.write_text(json.dumps(old))
+    again = add_event(client).json()
+    assert again["conference_id"] == first["conference_id"]
+    assert again["people_found"] == 5 and len(calls) == 2
+    people = {p["name"]: p for p in client.get("/api/v1/people", params={"conference_id": first["id"], "triage": "all"}).json()}
+    assert people["Public Guest"]["event_role"] == "attendee"
+    assert people["Avery Example"]["triage"] == "interesting"  # same person id: the shortlist survives

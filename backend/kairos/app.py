@@ -212,7 +212,23 @@ def create_app(settings: Settings | None = None):
             None,
         )
         if existing:
-            logs.event("conference.reopened", id=existing["id"], url=url)
+            if live:
+                # Refresh its people (a newer parser may find more, e.g. attendees). Person ids depend only on
+                # role and name, so shortlist decisions, notes and drafts stay attached.
+                event, freshness = load_event(url, settings, now())
+                for p in event["people"]:
+                    store().put("person", {**p, "id": existing["id"] + ":" + p["id"], "conference_id": existing["id"]})
+                ids = {existing["id"] + ":" + p["id"] for p in event["people"]}
+                kept = sum(1 for p in store().all("person") if p["conference_id"] == existing["id"] and p["id"] not in ids)
+                existing = {
+                    **existing,
+                    "people_found": len(event["people"]) + kept,
+                    "freshness": freshness,
+                    "stale": freshness == "stale",
+                    "collected_at": event["collected_at"],
+                }
+                store().put("conference", existing)
+            logs.event("conference.reopened", id=existing["id"], url=url, people=existing["people_found"])
             return {**existing, "status_url": api + f"/conference/{existing['id']}/status"}
         cid = uid("conference")
         conference = {

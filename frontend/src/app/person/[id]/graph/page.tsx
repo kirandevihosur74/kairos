@@ -12,8 +12,9 @@ import { routeId } from "@/lib/ranking";
 import { describeError } from "../../../onboarding/draft";
 
 function GraphView() {
-  const paramsId = useParams<{ id: string }>();
-  const id = routeId(paramsId.id);
+  const { id: rawId } = useParams<{ id: string }>();
+  // Decode before building links so person IDs are not URL-encoded twice.
+  const id = routeId(rawId);
   const params = useSearchParams();
   const memoryTab = params.get("tab") === "memory";
   const router = useRouter();
