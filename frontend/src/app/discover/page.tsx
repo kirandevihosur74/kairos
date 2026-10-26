@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { AppNav, Button, DesignIcon, LinkedInLink, PhoneShell, Portrait, RequireProfile, useToast } from "@/components";
+import { AppNav, Button, DesignIcon, FirstTip, LinkedInLink, PhoneShell, Portrait, RequireProfile, useToast } from "@/components";
 import { LoadMessage } from "@/components/LoadMessage";
 import { api, type PersonCard, type TriageDecision } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -68,10 +68,10 @@ function DiscoverDeck() {
       <article className="overflow-hidden rounded-xl border border-line bg-card">
         <Link href={`/person/${encodeURIComponent(current.id)}`} className="relative block h-[clamp(160px,32dvh,280px)]">
           <Portrait key={current.id} name={current.name} src={current.photo_url} />
-          <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-transparent to-black/75" />
+          {current.photo_url && <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-transparent to-black/75" />}
           <span className="absolute top-3 left-3 max-w-[70%] truncate rounded-full bg-card px-2.5 py-1 text-[11px]">{current.data_mode === "fixture" ? "Sample data" : current.event_role || "Listed on event page"}</span>
           <span className="absolute top-3 right-3 rounded-full bg-spectrum px-2.5 py-1 text-[11px]">{Math.round(current.score * 100)} fit</span>
-          <div className="absolute inset-x-4 bottom-3 text-white"><h2 className="font-serif text-[29px] leading-tight">{current.name}</h2><p className="mt-1 text-[13px] text-white/85">{[current.title, current.company].filter(Boolean).join(" · ")}</p></div>
+          <div className={`absolute inset-x-4 bottom-3 ${current.photo_url ? "text-white" : "text-ink"}`}><h2 className="font-serif text-[29px] leading-tight">{current.name}</h2><p className={`mt-1 text-[13px] ${current.photo_url ? "text-white/85" : "text-muted"}`}>{[current.title, current.company].filter(Boolean).join(" · ")}</p></div>
         </Link>
         <div className="flex flex-col gap-3 bg-cream px-4 py-3.5">
           <div className="flex flex-wrap items-center gap-1.5">{current.why.nodes.filter((n) => n.label).map((node, i) => <span key={node.id} className="contents">{i > 0 && <span className="text-faint" aria-hidden>›</span>}<span className={`rounded-md bg-card px-2 py-1 text-[11px] ${node.type === "Goal" ? "text-alert" : ""}`}>{node.label}</span></span>)}</div>
@@ -81,6 +81,7 @@ function DiscoverDeck() {
           {current.stale && <p className="text-xs text-muted">Saved snapshot · live refresh unavailable</p>}
         </div>
       </article>
+      {!capture && <FirstTip id="discover-interesting">Interesting adds them to your lead sheet. Nobody gets notified.</FirstTip>}
       <div className="flex gap-2.5"><Button className="h-[46px] font-normal text-alert" fullWidth disabled={pending} onClick={() => void triage("not_interesting")}>Skip</Button><Button className="h-[46px] font-normal" variant="primary" fullWidth disabled={pending} onClick={() => void triage("interesting")}>{pending ? "Saving…" : "Interesting"}</Button></div>
       <Link href={`/person/${encodeURIComponent(current.id)}/note`} className="flex min-h-8 items-center justify-center gap-1.5 text-[13px] text-alert"><Image src="/design/emoji-note.svg" alt="" width={16} height={16} unoptimized />Already met? Add a note</Link>
     </div>}

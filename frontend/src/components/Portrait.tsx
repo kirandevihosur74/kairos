@@ -10,6 +10,6 @@ export function Portrait({ name, src }: { name: string; src: string | null }) {
   return src && failedSrc !== src ? (
     <Image src={src} alt={name} fill sizes="(max-width: 390px) 92vw, 358px" className="rounded-none object-cover" style={{ objectFit: "cover", objectPosition: "center 30%", borderRadius: 0 }} unoptimized referrerPolicy="no-referrer" onError={() => setFailedSrc(src)} />
   ) : (
-    <div className="flex h-full items-center justify-center bg-subtle"><Avatar name={name} size="ring" /></div>
+    <div className="flex h-full items-center justify-center bg-cream"><Avatar name={name} size="ring" /></div>
   );
 }
