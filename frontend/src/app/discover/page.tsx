@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -9,6 +8,9 @@ import { LoadMessage } from "@/components/LoadMessage";
 import { api, type PersonCard, type TriageDecision } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { describeError } from "../onboarding/draft";
+
+/** Match score at or above this shows the "Strong fit" chip and gradient border. */
+const STRONG_FIT = 0.7;
 
 function DiscoverDeck() {
   const router = useRouter();
@@ -41,6 +43,11 @@ function DiscoverDeck() {
   }, [conferenceId, router, retry, reviewSkipped, capture, legacySheet, topic]);
 
   const current = data?.people.find((p) => p.id === data.queue[data.index]);
+  const strong = !!current && current.score >= STRONG_FIT;
+  const roundPhoto = !current?.photo_url || /avatar/i.test(current.photo_url);
+  const role = current ? [current.title, current.company].filter(Boolean).join(" · ") : "";
+  const opener = current?.openers[0]?.replace(/^["“]+|["”]+$/g, "").trim();
+  const tag = current?.data_mode === "fixture" ? "Sample data" : current?.event_role;
   useEffect(() => { if (current) setCurrentPersonId(current.id); }, [current, setCurrentPersonId]);
 
   async function triage(decision: Exclude<TriageDecision, null>) {
@@ -63,27 +70,33 @@ function DiscoverDeck() {
       <div className="flex items-center justify-between"><button aria-label="Back to Today" onClick={() => router.push("/today")} className="flex h-8 w-8 items-center"><DesignIcon name="back" /></button><span className="text-[14px]">{data.index + 1} of {data.queue.length}</span><button aria-label="Discovery options" aria-expanded={filters} onClick={() => setFilters(!filters)} className="flex h-8 w-8 items-center justify-end"><DesignIcon name="filter" /></button></div>
       {filters && <div className="flex flex-wrap gap-3 rounded-xl border border-line bg-card p-3 text-[13px]"><Link href="/graph" className="text-alert">Your graph</Link><Link href="/everyone" className="text-alert">Everyone</Link><Link href="/profile" className="text-alert">Edit interests</Link><Link href="/sheet" className="text-alert">Your shortlist</Link><Link href="/sheet?view=skipped" className="text-alert">Review skipped</Link><Link href="/events" className="text-alert">Switch event</Link></div>}
       <h1 className="font-serif text-[29px] leading-[1.3] tracking-[-0.01em]">{capture ? "Who did you meet?" : reviewSkipped ? "Another look." : topic ? `People into ${topic}` : "Who’s in the room?"}</h1>
-      {!capture && <div className="flex gap-4 text-xs text-muted"><Link href="/graph">Your graph →</Link><Link href="/everyone">Everyone →</Link></div>}
+      <div className="h-1 overflow-hidden rounded-full bg-subtle" aria-hidden><div className="h-full rounded-full bg-spectrum" style={{ width: `${((data.index + 1) / data.queue.length) * 100}%` }} /></div>
       {capture && <p className="text-sm text-muted">Find the person, then tap Add a note.</p>}
-      <article className="overflow-hidden rounded-xl border border-line bg-card">
-        <Link href={`/person/${encodeURIComponent(current.id)}`} className="relative block h-[clamp(160px,32dvh,280px)]">
-          <Portrait key={current.id} name={current.name} src={current.photo_url} />
-          {current.photo_url && <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-transparent to-black/75" />}
-          <span className="absolute top-3 left-3 max-w-[70%] truncate rounded-full bg-card px-2.5 py-1 text-[11px]">{current.data_mode === "fixture" ? "Sample data" : current.event_role || "Listed on event page"}</span>
-          <span className="absolute top-3 right-3 rounded-full bg-spectrum px-2.5 py-1 text-[11px]">{Math.round(current.score * 100)} fit</span>
-          <div className={`absolute inset-x-4 bottom-3 ${current.photo_url ? "text-white" : "text-ink"}`}><h2 className="font-serif text-[29px] leading-tight">{current.name}</h2><p className={`mt-1 text-[13px] ${current.photo_url ? "text-white/85" : "text-muted"}`}>{[current.title, current.company].filter(Boolean).join(" · ")}</p></div>
+      <div className={`rounded-[20px] ${strong ? "bg-spectrum p-[2px]" : "border border-line"}`}>
+      <article className="overflow-hidden rounded-[18px] bg-card">
+        <Link href={`/person/${encodeURIComponent(current.id)}`} aria-label={`Open ${current.name}`} className={`relative flex items-center justify-center ${roundPhoto ? "h-[clamp(150px,25dvh,210px)] bg-cream" : "h-[clamp(160px,30dvh,260px)]"}`}>
+          {roundPhoto ? <span className="relative block h-[120px] w-[120px] overflow-hidden rounded-full"><Portrait key={current.id} name={current.name} src={current.photo_url} /></span> : <Portrait key={current.id} name={current.name} src={current.photo_url} />}
+          {tag && <span className="absolute top-3 left-3 max-w-[60%] truncate rounded-full bg-card px-2.5 py-1 text-[11px]">{tag}</span>}
+          {strong && <span className="absolute top-3 right-3 rounded-full bg-spectrum px-2.5 py-1 text-[11px]">Strong fit</span>}
         </Link>
-        <div className="flex flex-col gap-3 bg-cream px-4 py-3.5">
-          <div className="flex flex-wrap items-center gap-1.5">{current.why.nodes.filter((n) => n.label).map((node, i) => <span key={node.id} className="contents">{i > 0 && <span className="text-faint" aria-hidden>›</span>}<span className={`rounded-md bg-card px-2 py-1 text-[11px] ${node.type === "Goal" ? "text-alert" : ""}`}>{node.label}</span></span>)}</div>
-          <div><p className="mb-1 text-[11px] text-muted">Open with</p><p className="text-[14px] leading-[1.45]">{current.openers[0] || current.next_step}</p></div>
-          {current.fun_fact && <div><p className="mb-1 text-[11px] text-muted">Small talk</p><p className="text-[14px]">{current.fun_fact}</p></div>}
-          <LinkedInLink url={current.linkedin_url} name={current.name} />
+        <div className="flex flex-col gap-3 p-4">
+          <div>
+            <h2 className="font-serif text-[30px] leading-tight">{current.name}</h2>
+            {role && <p className="mt-0.5 text-[13px] text-muted">{role}</p>}
+          </div>
+          {current.why.sentence && <p className="text-[15px] leading-[1.4] font-medium">{current.why.sentence}</p>}
+          {opener && <div className="rounded-xl bg-cream px-4 py-3"><p className="mb-1 text-[11px] font-semibold tracking-[0.04em] text-muted uppercase">Say</p><p className="font-serif text-[19px] leading-[1.25]">“{opener}”</p></div>}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted">
+            <Link href={`/person/${encodeURIComponent(current.id)}`}>Details</Link>
+            {current.linkedin_url && <LinkedInLink url={current.linkedin_url} name={current.name} />}
+            <Link href={`/person/${encodeURIComponent(current.id)}/note`}>Add a note</Link>
+          </div>
           {current.stale && <p className="text-xs text-muted">Saved snapshot · live refresh unavailable</p>}
         </div>
       </article>
+      </div>
       {!capture && <FirstTip id="discover-interesting">Interesting adds them to your lead sheet. Nobody gets notified.</FirstTip>}
       <div className="flex gap-2.5"><Button className="h-[46px] font-normal text-alert" fullWidth disabled={pending} onClick={() => void triage("not_interesting")}>Skip</Button><Button className="h-[46px] font-normal" variant="primary" fullWidth disabled={pending} onClick={() => void triage("interesting")}>{pending ? "Saving…" : "Interesting"}</Button></div>
-      <Link href={`/person/${encodeURIComponent(current.id)}/note`} className="flex min-h-8 items-center justify-center gap-1.5 text-[13px] text-alert"><Image src="/design/emoji-note.svg" alt="" width={16} height={16} unoptimized />Already met? Add a note</Link>
     </div>}
     <AppNav />
   </PhoneShell>;
