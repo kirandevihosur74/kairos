@@ -2,13 +2,15 @@ import io
 import json
 import logging
 import secrets
+import threading
 from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Literal
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -18,8 +20,10 @@ from redis.exceptions import RedisError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import logs, voice
+from .auth import LOCAL_USER, AuthError, ClerkDirectory, ClerkVerifier, bearer_token, current_user, user_scope
 from .config import Settings
-from .ingest import canonical_url, is_luma, load_event
+from .ingest import canonical_url, is_luma, load_event, needs_fetch
+from .limits import Limiter
 from .models import ConferenceInput, DraftEdit, DraftInput, NoteInput, Profile, TextImport, TriageInput
 from .service import cards, event_key, make_draft, memory, now, person, profile, require, suggest, uid
 from .store import FalkorStore, SQLiteStore
@@ -29,18 +33,13 @@ FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "people.json"
 MAX_UPLOAD = 2 * 1024 * 1024
 
 
-def create_app(settings: Settings | None = None):
+def create_app(settings: Settings | None = None, verifier: ClerkVerifier | None = None, directory=None):
     settings = settings or Settings()
+    directory = directory or ClerkDirectory(settings.clerk_secret_key)
+    admin_emails = {e.strip().casefold() for e in settings.admin_emails.split(",") if e.strip()}
     logs.setup(settings.log_level, settings.log_file)
 
-    @asynccontextmanager
-    async def lifespan(app):
-        store = (
-            FalkorStore(settings.falkordb_url, settings.graph_name)
-            if settings.storage == "falkordb"
-            else SQLiteStore(settings.sqlite_path)
-        )
-        app.state.store = store
+    def recover(store):
         # A stopped process must not leave an apparently active job forever.
         for conference in store.all("conference"):
             if conference["stage"] not in {"ready", "failed"}:
@@ -52,8 +51,31 @@ def create_app(settings: Settings | None = None):
                         "error": "Ingestion interrupted; create a new conference.",
                     },
                 )
+        return store
+
+    @asynccontextmanager
+    async def lifespan(app):
+        # Fail closed: Clerk mode refuses to start without a valid publishable key.
+        app.state.verifier = verifier
+        if settings.auth_mode == "clerk" and verifier is None:
+            parties = [p.strip() for p in settings.clerk_authorized_parties.split(",") if p.strip()]
+            app.state.verifier = ClerkVerifier(settings.clerk_publishable_key, parties or [settings.frontend_origin])
+        base = (
+            FalkorStore(settings.falkordb_url, settings.graph_name)
+            if settings.storage == "falkordb"
+            else SQLiteStore(settings.sqlite_path)
+        )
+        # With auth off, the base store holds the single local user's data. With Clerk, each user gets
+        # their own graph (or SQLite file) and the base store only answers health checks.
+        app.state.base = recover(base) if settings.auth_mode == "none" else base
+        app.state.user_stores = {}
+        app.state.user_stores_lock = threading.Lock()
+        # Counters live in Redis (FalkorDB) so limits survive restarts; SQLite mode keeps them in memory.
+        app.state.limiter = Limiter(base.db.connection if settings.storage == "falkordb" else None, settings)
         yield
-        store.close()
+        for user_store in app.state.user_stores.values():
+            user_store.close()
+        base.close()
 
     app = FastAPI(
         title="Kairos Career Networking API",
@@ -66,7 +88,7 @@ def create_app(settings: Settings | None = None):
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Content-Type", "X-API-Key"],
+        allow_headers=["Content-Type", "X-API-Key", "Authorization"],
     )
 
     @app.middleware("http")
@@ -113,12 +135,59 @@ def create_app(settings: Settings | None = None):
         logs.event("graph.unavailable", logging.ERROR, error=type(exc).__name__)
         return JSONResponse(status_code=503, content={"detail": "Graph database unavailable"})
 
-    def auth(x_api_key: Annotated[str | None, Header()] = None):
-        if settings.api_key and not secrets.compare_digest(x_api_key or "", settings.api_key):
-            raise HTTPException(401, "Valid X-API-Key required")
+    async def auth(request: Request, x_api_key: Annotated[str | None, Header()] = None):
+        """Identify the caller and apply the per-minute request limit.
+
+        Async on purpose: the user set here must be visible to the route, which FastAPI runs afterwards
+        in a worker thread with a copy of this request's context."""
+        if settings.auth_mode == "none":
+            if settings.api_key and not secrets.compare_digest(x_api_key or "", settings.api_key):
+                raise HTTPException(401, "Valid X-API-Key required")
+            current_user.set(LOCAL_USER)
+            return
+        token = bearer_token(request.headers.get("authorization"), request.cookies.get("__session"))
+        if not token:
+            raise HTTPException(401, "Sign in required")
+        try:
+            user = await run_in_threadpool(app.state.verifier.user_id, token)
+        except AuthError as exc:
+            logs.event("auth.rejected", logging.WARNING, reason=exc)
+            raise HTTPException(401, "Your session expired. Sign in again.") from None
+        current_user.set(user)
+        if not await run_in_threadpool(is_admin, user):
+            await run_in_threadpool(app.state.limiter.hit_request, user)
+
+    def is_admin(user):
+        if settings.auth_mode == "none" or user is None:
+            return True  # local development: one trusted user
+        return bool(admin_emails) and not admin_emails.isdisjoint(directory.verified_emails(user))
+
+    def spend(action):
+        """Count one costly action for the current user; raises 429 past their daily limit. Admins skip."""
+        user = current_user.get()
+        if not is_admin(user):
+            app.state.limiter.spend(user, action)
+
+    def open_store(user):
+        if user is None or settings.auth_mode == "none":
+            return app.state.base
+        stores = app.state.user_stores
+        if user not in stores:
+            with app.state.user_stores_lock:
+                if user not in stores:
+                    scope = user_scope(user)
+                    if settings.storage == "falkordb":
+                        name = f"{settings.graph_name}_u_{scope}"
+                        user_store = FalkorStore(settings.falkordb_url, name, db=app.state.base.db)
+                    else:
+                        path = settings.sqlite_path
+                        user_store = SQLiteStore(path.with_name(f"{path.stem}_u_{scope}{path.suffix}"))
+                    stores[user] = recover(user_store)
+        return stores[user]
 
     def store():
-        return app.state.store
+        # The signed-in user's own graph: one user's requests can never read another's memory.
+        return open_store(current_user.get())
 
     api = "/api/v1"
     protected = [Depends(auth)]
@@ -140,6 +209,13 @@ def create_app(settings: Settings | None = None):
             "draft_generation": "openai" if settings.openai_api_key else "template",
             "voice_transcription": settings.openai_transcribe_model if settings.openai_api_key else None,
         }
+
+    @app.get(api + "/me", dependencies=protected)
+    def me():
+        """Who is signed in, whether limits apply, and today's usage, for the profile screen."""
+        user = current_user.get()
+        admin = is_admin(user)
+        return {"user_id": user, "admin": admin, "usage": None if admin else app.state.limiter.usage(user)}
 
     @app.get(api + "/profile", dependencies=protected)
     def get_profile():
@@ -211,6 +287,8 @@ def create_app(settings: Settings | None = None):
             ),
             None,
         )
+        if live and needs_fetch(url, settings):
+            spend("event_fetch")  # a fresh Bright Data fetch; cached events are free
         if existing:
             if live:
                 # Refresh its people (a newer parser may find more, e.g. attendees). Person ids depend only on
@@ -388,6 +466,7 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(413, "Voice note must be at most 10 MB")
         if not audio:
             raise HTTPException(422, "Empty recording")
+        spend("voice")
         logs.event("voice.start", format=ext, bytes=len(audio), model=settings.openai_transcribe_model, person=person_id)
         try:
             with logs.Timer() as t:
@@ -419,7 +498,7 @@ def create_app(settings: Settings | None = None):
 
     @app.post(api + "/followups/{pid}/draft", status_code=201, dependencies=protected)
     def draft(pid: str, body: DraftInput):
-        value = make_draft(store(), pid, body, settings)
+        value = make_draft(store(), pid, body, settings, before_ai=lambda: spend("draft"))
         value["draft_id"] = value["id"]
         return store().put("draft", value)
 

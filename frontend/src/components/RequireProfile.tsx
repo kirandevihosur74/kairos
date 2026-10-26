@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiError, api, type Profile } from "@/lib/api";
@@ -18,8 +19,11 @@ export function RequireProfile({ children }: RequireProfileProps) {
   );
 
   const [retry, setRetry] = useState(0);
+  const { isLoaded, isSignedIn } = useAuth();
 
   useEffect(() => {
+    // Signed-out visitors are sent to sign-in by AuthBridge; never call the API without a session.
+    if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     api.getProfile().then(
       (p) => {
@@ -40,7 +44,7 @@ export function RequireProfile({ children }: RequireProfileProps) {
     return () => {
       cancelled = true;
     };
-  }, [router, retry]);
+  }, [router, retry, isLoaded, isSignedIn]);
 
   if (status !== "ready" || !profile) {
     return <PhoneShell withNavSpacer={false}><LoadMessage loading={status !== "error"} error={status === "error" ? "Could not connect to Kairos. Check the backend and try again." : null} onRetry={() => { setStatus("loading"); setRetry((n) => n + 1); }} /></PhoneShell>;

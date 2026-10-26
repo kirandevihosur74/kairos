@@ -267,15 +267,26 @@ function buildUrl(path: string, query?: Query): string {
   return url.toString();
 }
 
+// Registered by AuthBridge with Clerk's getToken, so every request carries the signed-in session.
+let tokenGetter: (() => Promise<string | null>) | null = null;
+export function setTokenGetter(getter: (() => Promise<string | null>) | null) {
+  tokenGetter = getter;
+}
+
+/** Window event fired when the API refuses a request for a usage limit (429); AuthBridge shows a toast. */
+export const LIMIT_EVENT = "kairos:limit";
+
 async function request<T>(
   path: string,
   init: RequestInit & { query?: Query } = {},
 ): Promise<T> {
   const { query, headers, ...rest } = init;
+  const token = tokenGetter ? await tokenGetter() : null;
   const res = await fetch(buildUrl(path, query), {
     ...rest,
     headers: {
       Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       // JSON bodies only: FormData uploads need the browser's multipart boundary header.
       ...(typeof rest.body === "string" ? { "Content-Type": "application/json" } : {}),
       ...headers,
@@ -290,14 +301,32 @@ async function request<T>(
       // Non-JSON body; keep statusText.
     }
     if (res.status === 404 && detail === "Conference not found") forgetConference();
+    if (res.status === 429 && typeof window !== "undefined") {
+      const message = typeof detail === "string" ? detail : "You've hit a usage limit. Try again later.";
+      window.dispatchEvent(new CustomEvent(LIMIT_EVENT, { detail: message }));
+    }
     throw new ApiError(res.status, detail);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
+export interface Usage {
+  used: number;
+  limit: number;
+}
+
+/** GET /me: admins have no limits (usage null); everyone else sees today's usage per costly action. */
+export interface Me {
+  user_id: string;
+  admin: boolean;
+  usage: { event_fetch: Usage; draft: Usage; voice: Usage } | null;
+}
+
 export const api = {
   health: () => request<HealthStatus>("/health"),
+
+  me: () => request<Me>("/me"),
 
   saveOnboarding: (profile: ProfileInput) =>
     request<Profile>("/onboarding", {

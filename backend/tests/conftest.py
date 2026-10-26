@@ -19,6 +19,7 @@ def settings(request, tmp_path):
         falkordb_url=os.getenv("TEST_FALKORDB_URL", "redis://localhost:6379"),
         graph_name="test_" + uuid4().hex,
         api_key="",
+        auth_mode="none",
         log_file=None,  # keep test runs out of the live workflow log
         _env_file=None,
     )

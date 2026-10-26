@@ -83,10 +83,17 @@ class SQLiteStore:
 class FalkorStore:
     engine = "falkordb"
 
-    def __init__(self, url, name):
+    def __init__(self, url, name, db=None):
         from falkordb import FalkorDB
         from redis.exceptions import ConnectionError as RedisConnectionError
 
+        self.owns_db = db is None
+        if db is not None:
+            # Another graph on an already-open connection (one graph per user).
+            self.db = db
+            self.graph = db.select_graph(name)
+            self.ping()
+            return
         for attempt in range(3):
             self.db = FalkorDB.from_url(url, socket_timeout=5, socket_connect_timeout=5)
             self.graph = self.db.select_graph(name)
@@ -190,4 +197,5 @@ class FalkorStore:
         self.graph.query("RETURN 1")
 
     def close(self):
-        self.db.connection.close()
+        if self.owns_db:
+            self.db.connection.close()

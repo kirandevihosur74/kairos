@@ -15,7 +15,7 @@ interface ToastItem {
 }
 
 interface ToastContextValue {
-  showToast: (message: string) => void;
+  showToast: (message: string, durationMs?: number) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -26,13 +26,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const idRef = useRef(0);
 
-  const showToast = useCallback((message: string) => {
+  const showToast = useCallback((message: string, durationMs = DEFAULT_DURATION_MS) => {
     idRef.current += 1;
     const id = idRef.current;
     setToasts((prev) => [...prev, { id, message }]);
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, DEFAULT_DURATION_MS);
+    }, durationMs);
   }, []);
 
   return (

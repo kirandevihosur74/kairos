@@ -13,6 +13,22 @@ class Settings(BaseSettings):
     graph_name: str = "kairos"
     frontend_origin: str = "http://localhost:3000"
     api_key: str = ""
+    # "clerk": every API request needs a verified Clerk session and each user gets their own graph.
+    # "none": local development and tests only; everything belongs to one local user.
+    auth_mode: Literal["clerk", "none"] = "clerk"
+    clerk_publishable_key: str = ""
+    # Origins allowed in a token's azp claim (comma-separated); defaults to frontend_origin.
+    clerk_authorized_parties: str = ""
+    # Backend API key, used only to read a user's verified emails to recognise admins.
+    clerk_secret_key: str = ""
+    # Comma-separated emails with no usage limits.
+    admin_emails: str = ""
+    # Daily limits per regular user, and a daily ceiling on fresh Bright Data fetches for all of them.
+    limit_event_fetches_per_day: int = 3
+    limit_drafts_per_day: int = 20
+    limit_voice_notes_per_day: int = 30
+    limit_requests_per_minute: int = 120
+    limit_global_event_fetches_per_day: int = 30
     brightdata_api_key: str = ""
     brightdata_zone: str = ""
     snapshot_dir: Path = Path("backend/data/snapshots")

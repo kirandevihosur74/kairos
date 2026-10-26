@@ -175,7 +175,7 @@ def test_referral_is_grounded_and_intro_does_not_invent_meeting(client):
 
 def test_api_key(tmp_path):
     with TestClient(
-        create_app(Settings(sqlite_path=tmp_path / "auth.db", api_key="demo-secret", _env_file=None))
+        create_app(Settings(sqlite_path=tmp_path / "auth.db", api_key="demo-secret", auth_mode="none", log_file=None, _env_file=None))
     ) as c:
         assert c.get("/api/v1/profile").status_code == 401
         assert (

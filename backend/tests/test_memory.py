@@ -19,7 +19,7 @@ def memory(client, cid, pid):
 def add_colleague(client, cid, template, name):
     """A second person at the same company, as ingestion would store them."""
     value = {**template, "id": f"{cid}:colleague", "name": name, "conference_id": cid}
-    client.app.state.store.put("person", value)
+    client.app.state.base.put("person", value)
     return value["id"]
 
 

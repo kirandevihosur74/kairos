@@ -251,7 +251,7 @@ def _ai_context(p, user, ns, request, remembered=()):
     return context, grounding
 
 
-def make_draft(store, pid, request, settings=None):
+def make_draft(store, pid, request, settings=None, before_ai=None):
     p = person(store, pid, request.conference_id)
     user = profile(store)
     ns = notes_for(store, pid)
@@ -270,6 +270,8 @@ def make_draft(store, pid, request, settings=None):
     if ai_ready and request.generation != "template":
         remembered = memory(store, p)["items"]
         context, grounding = _ai_context(p, user, ns, request, remembered)
+        if before_ai:
+            before_ai()  # usage limit for AI drafts; raises 429 when the user is over it
         log_event("draft.ai.start", person=pid, kind=request.kind, model=settings.openai_model, notes=len(context["notes"]), memory=len(remembered))
         try:
             with Timer() as t:

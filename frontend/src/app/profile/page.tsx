@@ -1,10 +1,11 @@
 "use client";
 
+import { SignOutButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button, RequireProfile, SectionLabel, useToast } from "@/components";
 import { BottomSheet } from "@/components/BottomSheet";
-import { api, type PersonCard, type Profile, type ProfileInput } from "@/lib/api";
+import { api, type Me, type PersonCard, type Profile, type ProfileInput } from "@/lib/api";
 import { rememberRanking } from "@/lib/ranking";
 import { useSession } from "@/lib/session";
 import { ChipField } from "../onboarding/ChipField";
@@ -42,10 +43,29 @@ function ProfileEditor({ profile }: { profile: Profile }) {
       {added.length > 0 && <p className="text-xs text-muted"><span className="mr-2 rounded-full bg-spectrum px-2 py-1 text-[10px] text-ink">NEW</span>{added.join(", ")}</p>}
       {suggestions.length > 0 && <section><SectionLabel>From people at this event</SectionLabel><div className="mt-3 flex flex-wrap gap-2">{suggestions.slice(0, 12).map((topic) => <button key={topic} type="button" disabled={input.interests.length >= 20} onClick={() => setInput({ ...input, interests: [...input.interests, topic] })} className="rounded-full bg-subtle px-3 py-2 text-[13px] text-muted disabled:opacity-40">+ {topic}</button>)}</div></section>}
       <details className="rounded-xl border border-line p-3"><summary className="text-sm">Edit roles and profile details</summary><div className="mt-4 flex flex-col gap-4"><ChipField label="Target roles" values={input.target_roles} onChange={(target_roles) => setInput({ ...input, target_roles })} placeholder="Add a role" /><label className="text-sm">Name<input maxLength={200} value={input.name} onChange={(e) => setInput({ ...input, name: e.target.value })} className="mt-2 w-full rounded-lg border border-line p-3" /></label><ChipField label="Skills" values={input.skills ?? []} onChange={(skills) => setInput({ ...input, skills })} placeholder="Add a skill" /><ChipField label="Location" values={input.location_preferences ?? []} onChange={(location_preferences) => setInput({ ...input, location_preferences })} placeholder="Add a location" /><label className="text-sm">About you<textarea rows={3} maxLength={5000} value={input.background ?? ""} onChange={(e) => setInput({ ...input, background: e.target.value })} className="mt-2 w-full rounded-lg border border-line p-3" /></label><label className="text-sm">LinkedIn · optional<input value={input.linkedin_url ?? ""} onChange={(e) => setInput({ ...input, linkedin_url: e.target.value })} className="mt-2 w-full rounded-lg border border-line p-3" /></label></div></details>
+      <AccountSection />
       <p className="text-xs text-muted">Saved to your profile. Updates every event, not just this one.</p>
       {error && <p role="alert" className="text-sm text-alert">{error}</p>}
       <div className="sticky bottom-0 bg-card pt-2"><Button fullWidth variant="primary" disabled={saving || !input.name.trim() || !input.interests.length || !input.target_roles.length} onClick={() => void save()}>{saving ? "Saving…" : "Save and re-rank"}</Button></div>
     </div>
   </BottomSheet>;
 }
+// Today's usage against the daily limits (admins have none), and sign-out.
+function AccountSection() {
+  const [me, setMe] = useState<Me | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.me().then((value) => { if (!cancelled) setMe(value); }, () => {});
+    return () => { cancelled = true; };
+  }, []);
+  const usage = me?.usage;
+  return <section className="rounded-xl border border-line p-3">
+    <SectionLabel>Account</SectionLabel>
+    <p className="mt-2 text-sm text-muted">
+      {!me ? "Loading…" : me.admin ? "Admin · no usage limits" : usage ? `Today: ${usage.event_fetch.used}/${usage.event_fetch.limit} new events · ${usage.draft.used}/${usage.draft.limit} AI drafts · ${usage.voice.used}/${usage.voice.limit} voice notes` : ""}
+    </p>
+    <SignOutButton redirectUrl="/sign-in"><button type="button" className="mt-3 text-sm font-medium text-alert">Sign out</button></SignOutButton>
+  </section>;
+}
+
 export default function ProfilePage() { return <RequireProfile>{(profile) => <ProfileEditor profile={profile} />}</RequireProfile>; }

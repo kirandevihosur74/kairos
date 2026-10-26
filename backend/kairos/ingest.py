@@ -512,6 +512,17 @@ def _fetch_with_retry(url, settings):
             time.sleep(RETRY_DELAY)
 
 
+def needs_fetch(url, settings):
+    """Whether loading this event would call Bright Data (no fresh, current-version snapshot)."""
+    path = snapshot_path(settings.snapshot_dir, url)
+    if not path.exists() or time.time() - path.stat().st_mtime >= settings.snapshot_max_age_hours * 3600:
+        return True
+    try:
+        return json.loads(path.read_text()).get("version", 1) < SNAPSHOT_VERSION
+    except ValueError:
+        return True
+
+
 def load_event(url, settings, collected_at):
     """Event people are the same for every user, so one fetch per event is cached and reused.
 

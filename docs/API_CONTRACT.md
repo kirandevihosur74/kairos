@@ -97,3 +97,19 @@ Record in the browser with `MediaRecorder` (Chrome/Android produce webm, iOS Saf
 ### Graph memory (FalkorDB)
 
 People are linked to companies with `(Person)-[:WORKS_AT]->(Company)` and carry a normalized `name_key`. `GET /people/{id}/memory` walks the graph from that person to (1) the same person at other events (`SAME_PERSON`) and (2) colleagues at the same company at any event (`WORKS_AT → Company ← WORKS_AT`), and returns only the user's own recorded interactions with them: meeting notes and approved messages. Appearing at the same company is not memory by itself. Each item carries the graph `path` that produced it. AI drafts receive these items as `memory` context, may mention the most relevant one, cite it in `grounded_on` (type `memory`, with `path`), and must not claim a colleague endorsed or referred the user. SQLite mode computes the same relations in Python.
+
+### Authentication and usage limits
+
+With `KAIROS_AUTH_MODE=clerk` (the default), every `/api/v1` request needs a Clerk session token, sent as `Authorization: Bearer <token>` (or the same-origin `__session` cookie). The backend verifies its RS256 signature against the Clerk instance's JWKS, `exp`/`nbf`, the issuer, and `azp` against the allowed origins; the user is the `sub` claim. Missing or invalid tokens get 401. Each user has their own graph, so profiles, events, notes, drafts and memory never cross users. `/health` stays public. `KAIROS_AUTH_MODE=none` is for local development and tests only: one local user, optional shared `X-API-Key`.
+
+Regular users have daily limits; admins (verified emails in `KAIROS_ADMIN_EMAILS`) have none. Over a limit the API answers 429 with a readable `detail` and `Retry-After`:
+
+| Limit | Default | Counts |
+| --- | --- | --- |
+| New events per user per day | 3 | Only fresh Bright Data fetches; cached events are free |
+| New events per day, all regular users | 30 | Same, shared ceiling protecting Bright Data credits |
+| AI drafts per user per day | 20 | AI generation only; template drafts are free |
+| Voice notes per user per day | 30 | Transcriptions |
+| Requests per user per minute | 120 | Every authenticated call |
+
+`GET /me` returns `{user_id, admin, usage}` where `usage` is `{event_fetch, draft, voice}` each `{used, limit}` (null for admins). Counters live in FalkorDB (Redis) and survive restarts.
