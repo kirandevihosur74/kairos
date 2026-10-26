@@ -6,7 +6,7 @@ export default function SignUpPage() {
     <div className="flex min-h-screen items-center justify-center">
       {/* cacheComponents: catch-all Clerk pages read the URL, so they render inside Suspense. */}
       <Suspense>
-        <SignUp />
+        <SignUp path="/sign-up" routing="path" signInUrl="/sign-in" fallbackRedirectUrl="/onboarding" />
       </Suspense>
     </div>
   );
