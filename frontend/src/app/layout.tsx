@@ -37,7 +37,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${instrumentSans.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-paper text-ink font-sans">
-        <ClerkProvider>
+        {/* Our own sign-in/sign-up pages, set in code rather than env so every build uses them; without
+            these, Clerk links to its hosted Account Portal on accounts.dev instead. */}
+        <ClerkProvider
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+          signInFallbackRedirectUrl="/"
+          signUpFallbackRedirectUrl="/onboarding"
+        >
           <Providers>{children}</Providers>
         </ClerkProvider>
       </body>
