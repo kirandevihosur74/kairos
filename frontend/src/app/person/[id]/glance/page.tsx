@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { Button, PhoneShell, Portrait, RequireProfile } from "@/components";
+import { Button, LinkedInLink, PhoneShell, Portrait, RequireProfile } from "@/components";
 import { LoadMessage } from "@/components/LoadMessage";
 import { api, type PersonCard, type Profile } from "@/lib/api";
 import { routeId } from "@/lib/ranking";
@@ -39,7 +39,7 @@ function Glance({ profile }: { profile: Profile }) {
         <section className="rounded-xl bg-cream p-4"><p className="mb-2 text-[11px] font-semibold uppercase text-muted">Say</p><p className="font-serif text-[24px] leading-[1.15]">{person.openers[0] || person.next_step}</p></section>
         {facts.length > 0 && <section><h2 className="mb-2 text-[11px] font-semibold uppercase text-muted">About {person.name.split(" ")[0]}</h2><ul className="space-y-2">{facts.map((fact) => { const shared = profile.interests.some((i) => i.toLowerCase() === fact.toLowerCase()); return <li key={fact} className="flex items-start gap-2 text-[14px]"><span aria-hidden className={shared ? "text-amber" : "text-faint"}>•</span><span className="flex-1">{fact}</span>{shared && <span className="rounded-full bg-cream px-2 py-1 text-[10px] text-alert">In common</span>}</li>; })}</ul></section>}
         {person.warm_intro && <p className="text-[13px] text-muted">{person.warm_intro}</p>}
-        <Link href={`/person/${encodeURIComponent(id)}`} className="text-xs text-alert">Full profile and memory →</Link>
+        <div className="flex flex-wrap items-center justify-between gap-2"><LinkedInLink url={person.linkedin_url} name={person.name} /><Link href={`/person/${encodeURIComponent(id)}`} className="text-xs text-alert">Full profile and memory →</Link></div>
         <div className="app-actions mt-auto flex gap-2.5"><Button fullWidth onClick={() => router.replace(data.queue.length > 1 ? `/person/${encodeURIComponent(data.queue[(index + 1) % data.queue.length].id)}/glance` : "/today")}>{data.queue.length > 1 ? "Next person" : "Back to Today"}</Button><Button variant="primary" fullWidth onClick={() => router.push(`/person/${encodeURIComponent(id)}/note`)}>I met {person.name.split(" ")[0]}</Button></div>
       </div>
     </div>}

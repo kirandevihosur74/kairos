@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { AppNav, Button, DesignIcon, PhoneShell, Portrait, RequireProfile, useToast } from "@/components";
+import { AppNav, Button, DesignIcon, LinkedInLink, PhoneShell, Portrait, RequireProfile, useToast } from "@/components";
 import { LoadMessage } from "@/components/LoadMessage";
 import { api, type PersonCard, type TriageDecision } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -77,6 +77,7 @@ function DiscoverDeck() {
           <div className="flex flex-wrap items-center gap-1.5">{current.why.nodes.filter((n) => n.label).map((node, i) => <span key={node.id} className="contents">{i > 0 && <span className="text-faint" aria-hidden>›</span>}<span className={`rounded-md bg-card px-2 py-1 text-[11px] ${node.type === "Goal" ? "text-alert" : ""}`}>{node.label}</span></span>)}</div>
           <div><p className="mb-1 text-[11px] text-muted">Open with</p><p className="text-[14px] leading-[1.45]">{current.openers[0] || current.next_step}</p></div>
           {current.fun_fact && <div><p className="mb-1 text-[11px] text-muted">Small talk</p><p className="text-[14px]">{current.fun_fact}</p></div>}
+          <LinkedInLink url={current.linkedin_url} name={current.name} />
           {current.stale && <p className="text-xs text-muted">Saved snapshot · live refresh unavailable</p>}
         </div>
       </article>

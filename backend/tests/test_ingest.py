@@ -131,6 +131,10 @@ def test_live_conference_ranks_judges_and_reuses_cache(live):
     why = {p["name"]: p["why"]["sentence"] for p in people}
     assert why["Avery Example"] == "Shared career interests: ai"
     assert why["Casey Example"] == "Shared career interests: ux"
+    # Cards carry the LinkedIn profile the event page listed (the app shows N/A for the rest).
+    linkedin = {p["name"]: p["linkedin_url"] for p in people}
+    assert linkedin["Public Guest"] == "https://www.linkedin.com/in/public-guest"
+    assert linkedin["Avery Example"] is None
     assert client.get("/health").json()["ingestion"] == "fixture_and_luma"
     # Event data is the same for every user: a second add within the freshness window does not refetch.
     assert add_event(client).status_code == 201

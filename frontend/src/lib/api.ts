@@ -126,6 +126,8 @@ export interface PersonCard {
   company: string | null;
   topics: string[];
   photo_url: string | null;
+  /** Public LinkedIn profile when the event page listed one. */
+  linkedin_url?: string | null;
   source: PersonSource;
   data_mode: DataMode;
   /** Live people only: how the event page presents them (speaker, judge, host, ...). */
