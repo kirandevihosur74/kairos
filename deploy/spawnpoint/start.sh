@@ -12,6 +12,9 @@ redis-server --loadmodule /var/lib/falkordb/bin/falkordb.so \
   --bind 127.0.0.1 --port 6379 --dir "$DATA/falkordb" --appendonly yes &
 until redis-cli -p 6379 ping >/dev/null 2>&1; do sleep 0.2; done
 
+# Clerk: the backend reads the same two keys the Next.js app uses, so only those need setting.
+export KAIROS_CLERK_PUBLISHABLE_KEY="${KAIROS_CLERK_PUBLISHABLE_KEY:-${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}}"
+export KAIROS_CLERK_SECRET_KEY="${KAIROS_CLERK_SECRET_KEY:-${CLERK_SECRET_KEY:-}}"
 export KAIROS_STORAGE=falkordb
 export KAIROS_FALKORDB_URL=redis://127.0.0.1:6379
 export KAIROS_SNAPSHOT_DIR="$DATA/snapshots"

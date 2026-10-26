@@ -8,7 +8,8 @@ WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
-RUN npx next build
+# The Clerk publishable key (public) is compiled into the client bundle; bundle.sh ships it as a file.
+RUN NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$(cat clerk-publishable-key 2>/dev/null)" npx next build
 
 FROM falkordb/falkordb:6.0.3
 RUN apt-get update \
