@@ -30,6 +30,8 @@ class Limiter:
     def __init__(self, redis, settings):
         self.redis = redis
         self.settings = settings
+        # Scoped to the graph, so separate deployments or test runs sharing one Redis never share counters.
+        self.prefix = f"kairos:rl:{settings.graph_name}"
         self.memory = {}
         self.lock = threading.Lock()
 
@@ -62,7 +64,7 @@ class Limiter:
 
     def hit_request(self, user):
         minute = int(time.time() // 60)
-        if self._incr(f"kairos:rl:req:{user}:{minute}", 120) > self.settings.limit_requests_per_minute:
+        if self._incr(f"{self.prefix}:req:{user}:{minute}", 120) > self.settings.limit_requests_per_minute:
             log_event("limit.hit", 30, kind="requests", user=user)
             raise HTTPException(
                 429, "You're going a bit fast. Wait a minute and try again.", headers={"Retry-After": "60"}
@@ -75,13 +77,13 @@ class Limiter:
         day = time.strftime("%Y%m%d", time.gmtime())
         ttl = seconds_until_tomorrow() + 60
         retry = {"Retry-After": str(seconds_until_tomorrow())}
-        key = f"kairos:rl:{action}:{user}:{day}"
+        key = f"{self.prefix}:{action}:{user}:{day}"
         if self._incr(key, ttl) > limit:
             self._decr(key)  # a refused attempt is not usage
             log_event("limit.hit", 30, kind=action, user=user, limit=limit)
             raise HTTPException(429, message.format(limit=limit) + ". Try again tomorrow.", headers=retry)
         if action == "event_fetch":
-            shared = f"kairos:rl:event_fetch:all:{day}"
+            shared = f"{self.prefix}:event_fetch:all:{day}"
             if self._incr(shared, ttl) > self.settings.limit_global_event_fetches_per_day:
                 self._decr(shared)
                 self._decr(key)
@@ -96,6 +98,6 @@ class Limiter:
     def usage(self, user):
         day = time.strftime("%Y%m%d", time.gmtime())
         return {
-            action: {"used": self._get(f"kairos:rl:{action}:{user}:{day}"), "limit": getattr(self.settings, attribute)}
+            action: {"used": self._get(f"{self.prefix}:{action}:{user}:{day}"), "limit": getattr(self.settings, attribute)}
             for action, (attribute, _) in ACTIONS.items()
         }

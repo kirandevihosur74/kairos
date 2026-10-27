@@ -33,6 +33,15 @@ FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "people.json"
 MAX_UPLOAD = 2 * 1024 * 1024
 
 
+def with_guests(store, conference):
+    """Adds how many attendees (guest-list people) were found, so the app can say when a host keeps the
+    guest list private or shows only part of it. Counted from stored people, so older events get it too."""
+    attendees = sum(
+        1 for p in store.all("person") if p["conference_id"] == conference["id"] and p.get("event_role") == "attendee"
+    )
+    return {**conference, "attendees_found": attendees, "guest_count": conference.get("guest_count")}
+
+
 def create_app(settings: Settings | None = None, verifier: ClerkVerifier | None = None, directory=None):
     settings = settings or Settings()
     directory = directory or ClerkDirectory(settings.clerk_secret_key)
@@ -304,10 +313,11 @@ def create_app(settings: Settings | None = None, verifier: ClerkVerifier | None 
                     "freshness": freshness,
                     "stale": freshness == "stale",
                     "collected_at": event["collected_at"],
+                    "guest_count": event.get("guest_count"),
                 }
                 store().put("conference", existing)
             logs.event("conference.reopened", id=existing["id"], url=url, people=existing["people_found"])
-            return {**existing, "status_url": api + f"/conference/{existing['id']}/status"}
+            return {**with_guests(store(), existing), "status_url": api + f"/conference/{existing['id']}/status"}
         cid = uid("conference")
         conference = {
             "id": cid,
@@ -338,6 +348,7 @@ def create_app(settings: Settings | None = None, verifier: ClerkVerifier | None 
                     start_at=event["start_at"],
                     end_at=event["end_at"],
                     city=event["city"],
+                    guest_count=event.get("guest_count"),
                 )
             else:
                 # Fixture mode stores the URL for context only and performs no external requests.
@@ -354,11 +365,12 @@ def create_app(settings: Settings | None = None, verifier: ClerkVerifier | None 
             store().put("conference", {**conference, "stage": "failed", "error": "People loading failed"})
             raise
         store().put("conference", conference)
-        return {**conference, "status_url": api + f"/conference/{cid}/status"}
+        return {**with_guests(store(), conference), "status_url": api + f"/conference/{cid}/status"}
 
     @app.get(api + "/conference/{cid}/status", dependencies=protected)
     def status(cid: str):
-        return require(store(), "conference", cid)
+        s = store()
+        return with_guests(s, require(s, "conference", cid))
 
     @app.get(api + "/conferences", dependencies=protected)
     def list_conferences():

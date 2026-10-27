@@ -135,6 +135,10 @@ def test_live_conference_ranks_judges_and_reuses_cache(live):
     linkedin = {p["name"]: p["linkedin_url"] for p in people}
     assert linkedin["Public Guest"] == "https://www.linkedin.com/in/public-guest"
     assert linkedin["Avery Example"] is None
+    # The app warns when the guest list is private or partial: 1 attendee shown publicly out of 42 going.
+    status = client.get(f"/api/v1/conference/{conference['id']}/status").json()
+    assert (status["attendees_found"], status["guest_count"]) == (1, 42)
+    assert (conference["attendees_found"], conference["guest_count"]) == (1, 42)
     assert client.get("/health").json()["ingestion"] == "fixture_and_luma"
     # Event data is the same for every user: a second add within the freshness window does not refetch.
     assert add_event(client).status_code == 201
