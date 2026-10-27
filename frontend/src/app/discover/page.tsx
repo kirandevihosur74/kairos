@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -44,6 +45,8 @@ function DiscoverDeck() {
 
   const current = data?.people.find((p) => p.id === data.queue[data.index]);
   const strong = !!current && current.score >= STRONG_FIT;
+  // No bio or title topics on the event page: we can't judge fit, which is different from a weak match.
+  const unknown = !!current && current.topics.length === 0;
   const roundPhoto = !current?.photo_url || /avatar/i.test(current.photo_url);
   const role = current ? [current.title, current.company].filter(Boolean).join(" · ") : "";
   const opener = current?.openers[0]?.replace(/^["“]+|["”]+$/g, "").trim();
@@ -78,25 +81,26 @@ function DiscoverDeck() {
           {roundPhoto ? <span className="relative block h-[120px] w-[120px] overflow-hidden rounded-full"><Portrait key={current.id} name={current.name} src={current.photo_url} /></span> : <Portrait key={current.id} name={current.name} src={current.photo_url} />}
           {tag && <span className="absolute top-3 left-3 max-w-[60%] truncate rounded-full bg-card px-2.5 py-1 text-[11px]">{tag}</span>}
           {strong && <span className="absolute top-3 right-3 rounded-full bg-spectrum px-2.5 py-1 text-[11px]">Strong fit</span>}
+          {unknown && <span className="absolute top-3 right-3 rounded-full bg-card px-2.5 py-1 text-[11px] text-muted">Not enough info</span>}
         </Link>
         <div className="flex flex-col gap-3 p-4">
           <div>
             <h2 className="font-serif text-[30px] leading-tight">{current.name}</h2>
             {role && <p className="mt-0.5 text-[13px] text-muted">{role}</p>}
           </div>
-          {current.why.sentence && <p className="text-[15px] leading-[1.4] font-medium">{current.why.sentence}</p>}
+          {unknown ? <p className="text-[15px] leading-[1.4] text-muted">The event page doesn’t say what they work on.{current.linkedin_url ? " Check their LinkedIn before you reach out." : ""}</p> : current.why.sentence && <p className="text-[15px] leading-[1.4] font-medium">{current.why.sentence}</p>}
           {opener && <div className="rounded-xl bg-cream px-4 py-3"><p className="mb-1 text-[11px] font-semibold tracking-[0.04em] text-muted uppercase">Say</p><p className="font-serif text-[19px] leading-[1.25]">“{opener}”</p></div>}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted">
             <Link href={`/person/${encodeURIComponent(current.id)}`}>Details</Link>
-            {current.linkedin_url && <LinkedInLink url={current.linkedin_url} name={current.name} />}
-            <Link href={`/person/${encodeURIComponent(current.id)}/note`}>Add a note</Link>
+            <LinkedInLink url={current.linkedin_url} name={current.name} />
           </div>
           {current.stale && <p className="text-xs text-muted">Saved snapshot · live refresh unavailable</p>}
         </div>
       </article>
       </div>
-      {!capture && <FirstTip id="discover-interesting">Interesting adds them to your lead sheet. Nobody gets notified.</FirstTip>}
+      {!capture && <FirstTip id="discover-interesting">Interesting adds them to your shortlist. Nobody gets notified.</FirstTip>}
       <div className="flex gap-2.5"><Button className="h-[46px] font-normal text-alert" fullWidth disabled={pending} onClick={() => void triage("not_interesting")}>Skip</Button><Button className="h-[46px] font-normal" variant="primary" fullWidth disabled={pending} onClick={() => void triage("interesting")}>{pending ? "Saving…" : "Interesting"}</Button></div>
+      <Link href={`/person/${encodeURIComponent(current.id)}/note`} className="flex min-h-8 items-center justify-center gap-1.5 text-[13px] text-alert"><Image src="/design/emoji-note.svg" alt="" width={16} height={16} unoptimized />Already met? Add a note</Link>
     </div>}
     <AppNav />
   </PhoneShell>;

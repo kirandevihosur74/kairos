@@ -9,7 +9,7 @@ const steps = [
   {
     icon: "/design/icon-compass.svg",
     label: "Before",
-    text: "Paste an event link. You’ll see who’s speaking and judging, ranked by what you care about. Mark the people you want to meet.",
+    text: "Paste an event link. You’ll see who’s speaking and judging, ranked by the roles you’re targeting and what you care about. Mark the people you want to meet.",
   },
   {
     icon: "/design/icon-mic.svg",
