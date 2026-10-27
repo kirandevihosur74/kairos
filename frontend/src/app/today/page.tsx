@@ -5,7 +5,7 @@ import { Logo } from "@/components/Logo";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AppNav, Avatar, Button, Card, PhoneShell, RequireProfile } from "@/components";
+import { AppNav, Avatar, Button, Card, FirstTip, PhoneShell, RequireProfile } from "@/components";
 import { LoadMessage } from "@/components/LoadMessage";
 import { api, type Conference, type PersonCard, type Profile } from "@/lib/api";
 import { eventDate, eventPhase } from "@/lib/events";
@@ -42,6 +42,7 @@ function Today({ profile }: { profile: Profile }) {
       <div className="mt-2 flex gap-2"><Button fullWidth variant="primary" onClick={() => router.push("/discover")}>Discover people</Button><Button fullWidth className="border-line" onClick={() => router.push("/recap")}>Day recap</Button></div>
       <div className="flex justify-center gap-5 text-xs text-muted"><Link href="/graph" className="py-2">Your graph →</Link><Link href="/profile" className="py-2">Refine your interests →</Link></div>
     </>}
+    {data && <FirstTip id="today-mic" className="mt-auto">Tap the mic anytime to save a note. You can choose who it was after.</FirstTip>}
   </div><AppNav /></PhoneShell>;
 }
 export default function TodayPage() { return <RequireProfile>{(profile) => <Today profile={profile} />}</RequireProfile>; }

@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   AppNav,
+  FirstTip,
   Avatar,
   Button,
   Card,
@@ -125,6 +126,7 @@ function PersonPageInner({ id }: { id: string }) {
 
         <PersonHeader person={person} />
         <Link href={`/person/${encodeURIComponent(person.id)}/glance`} className="text-xs text-alert">Open glance brief →</Link>
+        <FirstTip id="person-page" pointer="up">Open the glance brief before you walk up. What you learn after goes in your notes below.</FirstTip>
 
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between"><SectionLabel>Why them</SectionLabel><Link href={`/person/${encodeURIComponent(person.id)}/graph`} className="text-xs text-alert">View graph →</Link></div>

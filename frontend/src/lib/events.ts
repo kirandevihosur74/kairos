@@ -1,9 +1,9 @@
 import type { Conference, ConferenceSummary } from "./api";
 
 export function eventDate(event: Pick<Conference | ConferenceSummary, "start_at" | "end_at">): string {
-  if (!event.start_at) return "Date not listed";
+  if (!event.start_at) return "";
   const start = new Date(event.start_at);
-  if (Number.isNaN(start.getTime())) return "Date not listed";
+  if (Number.isNaN(start.getTime())) return "";
   return start.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 

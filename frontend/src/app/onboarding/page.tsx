@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Button, PhoneShell } from "@/components";
 import { api } from "@/lib/api";
+import { hasSeenWelcome } from "@/lib/welcome";
 import {
   applyPreview,
   describeError,
@@ -20,6 +21,10 @@ type Mode = "idle" | "paste";
 
 export default function OnboardingImportPage() {
   const router = useRouter();
+  // First visit on this device: explain the app once before setup.
+  useEffect(() => {
+    if (!hasSeenWelcome()) router.replace("/welcome");
+  }, [router]);
   const fileRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<Draft>(() => readStoredDraft());
   const [mode, setMode] = useState<Mode>("idle");

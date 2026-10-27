@@ -3,6 +3,7 @@ export { Logo } from "./Logo";
 export { LinkedInLink } from "./LinkedInLink";
 export { DesignIcon } from "./DesignIcon";
 export { Portrait } from "./Portrait";
+export { FirstTip } from "./FirstTip";
 export { Avatar } from "./Avatar";
 export type { AvatarProps } from "./Avatar";
 export { BottomNav } from "./BottomNav";
